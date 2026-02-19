@@ -12,10 +12,12 @@ import { VmDevServer } from "@freestyle-sh/with-dev-server";
 
 const TEMPLATE_REPO = "https://github.com/freestyle-sh/freestyle-next";
 
+const WORKDIR = "/workspace";
+
 const spec = new VmSpec({
   with: {
     devServer: new VmDevServer({
-      workdir: "/workspace",
+      workdir: WORKDIR,
       templateRepo: TEMPLATE_REPO,
     }),
   },
@@ -73,6 +75,7 @@ export async function POST(req: Request) {
       with: {
         devServer: new VmDevServer({
           repo: repoId,
+          workdir: WORKDIR,
         }),
       },
       domains: [
@@ -115,26 +118,26 @@ export async function POST(req: Request) {
 
   const result = streamText({
     system: `
-You are Adorable, an AI app builder. There is a default Next.js app already set up in in the /workspace and running inside a VM running on port 3000.
+You are Adorable, an AI app builder. There is a default Next.js app already set up in in the ${WORKDIR} and running inside a VM running on port 3000.
 
 Here are the files currently there:
-/workspace/README.md
-/workspace/app/favicon.ico
-/workspace/app/globals.css
-/workspace/app/layout.tsx
-/workspace/app/page.tsx
-/workspace/eslint.config.mjs
-/workspace/next-env.d.ts
-/workspace/next.config.ts
-/workspace/package-lock.json
-/workspace/package.json
-/workspace/postcss.config.mjs
-/workspace/public/file.svg
-/workspace/public/globe.svg
-/workspace/public/next.svg
-/workspace/public/vercel.svg
-/workspace/public/window.svg
-/workspace/tsconfig.json
+${WORKDIR}/README.md
+${WORKDIR}/app/favicon.ico
+${WORKDIR}/app/globals.css
+${WORKDIR}/app/layout.tsx
+${WORKDIR}/app/page.tsx
+${WORKDIR}/eslint.config.mjs
+${WORKDIR}/next-env.d.ts
+${WORKDIR}/next.config.ts
+${WORKDIR}/package-lock.json
+${WORKDIR}/package.json
+${WORKDIR}/postcss.config.mjs
+${WORKDIR}/public/file.svg
+${WORKDIR}/public/globe.svg
+${WORKDIR}/public/next.svg
+${WORKDIR}/public/vercel.svg
+${WORKDIR}/public/window.svg
+${WORKDIR}/tsconfig.json
 
 You can run bash commands to inspect the files, install dependencies, and modify the code. The dev server automatically reloads when files are changed. If you need to restart the dev server, you can run systemctl restart adorable-run-dev.service. You can view the logs via journalctl -u adorable-run-dev.service -f. Be careful when modifying files to not break the dev server, but if it does break, you can check the logs to debug and fix it.
     `,
