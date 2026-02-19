@@ -83,7 +83,9 @@ export const Assistant = () => {
               > */}
               <AssistantIf
                 condition={({ thread }) =>
-                  thread.messages[0]?.metadata?.adorable
+                  thread.messages.some(
+                    (message) => message.metadata?.custom?.adorable,
+                  )
                 }
               >
                 <AppPreview />
@@ -105,9 +107,13 @@ function AppPreview() {
   //     ?.parts.find((part) => part.type === "tool-call"),
   // );
 
-  const toolCall = useAuiState(
-    ({ thread }) => thread.messages[0]?.metadata?.adorable,
-  );
+  const toolCall = useAuiState(({ thread }) => {
+    for (let i = thread.messages.length - 1; i >= 0; i -= 1) {
+      const metadata = thread.messages[i]?.metadata?.custom?.adorable;
+      if (metadata) return metadata;
+    }
+    return undefined;
+  });
 
   return (
     <div className="h-full">
