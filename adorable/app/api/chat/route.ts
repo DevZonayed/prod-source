@@ -11,7 +11,6 @@ import { z } from "zod";
 import { VmDevServer } from "@freestyle-sh/with-dev-server";
 
 const TEMPLATE_REPO = "https://github.com/freestyle-sh/freestyle-next";
-
 const WORKDIR = "/workspace";
 
 const spec = new VmSpec({
