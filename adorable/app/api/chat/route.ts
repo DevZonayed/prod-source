@@ -1,4 +1,3 @@
-import { snapshot } from "@/lib/vm-snapshot";
 import { openai } from "@ai-sdk/openai";
 import {
   streamText,
@@ -9,6 +8,18 @@ import {
 } from "ai";
 import { freestyle, VmSpec } from "freestyle-sandboxes";
 import { z } from "zod";
+import { VmDevServer } from "@freestyle-sh/with-dev-server";
+
+const TEMPLATE_REPO = "https://github.com/freestyle-sh/freestyle-next";
+
+const spec = new VmSpec({
+  with: {
+    devServer: new VmDevServer({
+      workdir: "/workspace",
+      templateRepo: TEMPLATE_REPO,
+    }),
+  },
+});
 
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
@@ -56,33 +67,24 @@ export async function POST(req: Request) {
     const domain = crypto.randomUUID() + "-adorable.style.dev";
 
     console.log("Creating VM with domain:", domain);
-    const { vmId } = await freestyle.vms.create({
-      snapshot: snapshot,
+
+    const { vm, vmId } = await freestyle.vms.create({
+      snapshot: spec,
+      with: {
+        devServer: new VmDevServer({
+          repo: repoId,
+        }),
+      },
       domains: [
         {
           domain: domain,
           vmPort: 3000,
         },
       ],
-      recreate: true,
-      git: {
-        repos: [
-          {
-            repo: repoId,
-            path: "/workspace",
-          },
-        ],
-        config: {
-          user: {
-            email: "adorable@freestyle.sh",
-            name: "Adorable",
-          },
-        },
-      },
     });
 
     adorableMetadata = {
-      vmId,
+      vmId: vmId,
       repoId,
       url: "https://" + domain,
     };
@@ -138,12 +140,12 @@ You can run bash commands to inspect the files, install dependencies, and modify
     `,
     model: openai.responses("gpt-5-mini"),
     messages: await convertToModelMessages(messages),
-    providerOptions: {
-      openai: {
-        reasoningEffort: "low",
-        reasoningSummary: "auto",
-      },
-    },
+    // providerOptions: {
+    //   openai: {
+    //     reasoningEffort: "low",
+    //     reasoningSummary: "auto",
+    //   },
+    // },
     tools: { bash: bashTool },
     stopWhen: stepCountIs(100),
   });
