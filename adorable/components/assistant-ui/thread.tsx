@@ -18,6 +18,10 @@ import {
   WriteFileToolCard,
 } from "@/components/assistant-ui/tool-cards";
 import { ToolFallback } from "@/components/assistant-ui/tool-fallback";
+import {
+  groupConsecutiveToolCalls,
+  ToolCallGroup,
+} from "@/components/assistant-ui/tool-group";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -226,24 +230,27 @@ const AssistantMessage: FC = () => {
       data-role="assistant"
     >
       <div className="aui-assistant-message-content px-2 leading-relaxed wrap-break-word text-foreground">
-        <MessagePrimitive.Parts
+        <MessagePrimitive.Unstable_PartsGrouped
+          groupingFunction={groupConsecutiveToolCalls}
           components={{
             Text: MarkdownText,
             Reasoning,
-            ReasoningGroup,
+            Group: ToolCallGroup,
             tools: {
-              bashTool: BashToolCard,
-              readFileTool: ReadFileToolCard,
-              writeFileTool: WriteFileToolCard,
-              listFilesTool: ListFilesToolCard,
-              searchFilesTool: SearchFilesToolCard,
-              replaceInFileTool: ReplaceInFileToolCard,
-              appendToFileTool: AppendToFileToolCard,
-              makeDirectoryTool: MakeDirectoryToolCard,
-              movePathTool: MovePathToolCard,
-              deletePathTool: DeletePathToolCard,
+              by_name: {
+                bashTool: BashToolCard,
+                readFileTool: ReadFileToolCard,
+                writeFileTool: WriteFileToolCard,
+                listFilesTool: ListFilesToolCard,
+                searchFilesTool: SearchFilesToolCard,
+                replaceInFileTool: ReplaceInFileToolCard,
+                appendToFileTool: AppendToFileToolCard,
+                makeDirectoryTool: MakeDirectoryToolCard,
+                movePathTool: MovePathToolCard,
+                deletePathTool: DeletePathToolCard,
+              },
               Fallback: ToolFallback,
-            } as unknown as { Fallback: typeof ToolFallback },
+            },
           }}
         />
         <MessageError />

@@ -1,4 +1,4 @@
-import { openai } from "@ai-sdk/openai";
+import { openai, OpenAIChatLanguageModelOptions } from "@ai-sdk/openai";
 import {
   streamText,
   convertToModelMessages,
@@ -153,6 +153,11 @@ export async function POST(req: Request) {
     model: openai.responses(MODEL),
     messages: await convertToModelMessages(messages),
     tools,
+    providerOptions: {
+      openai: {
+        reasoningEffort: "low",
+      } satisfies OpenAIChatLanguageModelOptions,
+    },
     stopWhen: stepCountIs(100),
   });
 
