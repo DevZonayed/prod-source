@@ -49,6 +49,29 @@ export const createTools = (vm: Vm) => {
     };
   };
 
+  const getDevServerLogs = async () => {
+    const devServer = (vm as { devServer?: { getLogs?: () => unknown } })
+      .devServer;
+    if (!devServer || typeof devServer.getLogs !== "function") {
+      return { ok: false, error: "Dev server logs unavailable." };
+    }
+
+    try {
+      const raw = await devServer.getLogs();
+      const logs = Array.isArray(raw)
+        ? raw.join("\n")
+        : typeof raw === "string"
+          ? raw
+          : JSON.stringify(raw, null, 2);
+      return { ok: true, logs };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : "Failed to read logs.",
+      };
+    }
+  };
+
   const bashTool = tool({
     description:
       "Run a bash command inside the Adorable VM and return its output.",
@@ -287,16 +310,20 @@ export const createTools = (vm: Vm) => {
       })
       .passthrough(),
     execute: async ({ message }) => {
-      const gitCommand = `git -C ${shellQuote(WORKDIR)} commit -am ${shellQuote(
+      const gitCommand = `git -C ${shellQuote(WORKDIR)} config user.name ${shellQuote(
+        "Adorable",
+      )} && git -C ${shellQuote(WORKDIR)} config user.email ${shellQuote(
+        "adorable@freestyle.sh",
+      )} && git -C ${shellQuote(WORKDIR)} commit -am ${shellQuote(
         message,
-      )}`;
+      )} && git -C ${shellQuote(WORKDIR)} push`;
       return runExecCommand(gitCommand);
     },
   });
 
   const checkAppTool = tool({
     description:
-      "Check if the app is running correctly by making an HTTP request to the dev server. You MUST call this tool before finishing any task to verify the app is not broken. If the status code is not 200, investigate and fix the issue before telling the user you are done.",
+      "Check if the app is running correctly by making an HTTP request to the dev server and scanning Next.js logs for runtime or compile issues. You MUST call this tool before finishing any task to verify the app is not broken. If the status code is not 200 or logs show errors, investigate and fix the issue before telling the user you are done.",
     inputSchema: z
       .object({
         path: z
@@ -309,18 +336,34 @@ export const createTools = (vm: Vm) => {
       const urlPath = path?.startsWith("/") ? path : `/${path ?? ""}`;
       const command = `curl -s -o /dev/null -w '{"statusCode":%{http_code},"totalTime":%{time_total},"url":"%{url_effective}"}' http://localhost:${VM_PORT}${urlPath}`;
       const result = await runExecCommand(command);
+      const logsResult = await getDevServerLogs();
+      const logText = logsResult.ok && logsResult.logs ? logsResult.logs : "";
+      const issueRegex =
+        /(error -|failed to compile|module not found|unhandled runtime error|referenceerror|typeerror|syntaxerror|cannot find module)/i;
+      const issues = logText
+        ? logText
+            .split("\n")
+            .filter((line) => issueRegex.test(line))
+            .slice(-20)
+        : [];
       try {
         const info = JSON.parse(result.stdout);
-        const ok = info.statusCode >= 200 && info.statusCode < 400;
+        const httpOk = info.statusCode >= 200 && info.statusCode < 400;
+        const ok = httpOk && issues.length === 0;
         return {
           ok,
           statusCode: info.statusCode,
           totalTime: info.totalTime,
           url: info.url,
+          issues,
+          issueCount: issues.length,
+          logsError: logsResult.ok ? null : logsResult.error,
           ...(ok
             ? {}
             : {
-                error: `App returned HTTP ${info.statusCode}. Investigate the issue before reporting completion.`,
+                error: httpOk
+                  ? "App is reachable, but Next.js logs show issues."
+                  : `App returned HTTP ${info.statusCode}. Investigate the issue before reporting completion.`,
               }),
         };
       } catch {
@@ -328,8 +371,34 @@ export const createTools = (vm: Vm) => {
           ok: false,
           error: "Failed to reach the dev server. It may not be running.",
           raw: result.stdout,
+          logsError: logsResult.ok ? null : logsResult.error,
         };
       }
+    },
+  });
+
+  const devServerLogsTool = tool({
+    description:
+      "Fetch recent dev server logs (Next.js). Use this to debug build/runtime issues.",
+    inputSchema: z
+      .object({
+        maxLines: z
+          .number()
+          .int()
+          .min(1)
+          .max(2000)
+          .default(200)
+          .describe("Maximum number of log lines to return."),
+      })
+      .passthrough(),
+    execute: async ({ maxLines }) => {
+      const logsResult = await getDevServerLogs();
+      if (!logsResult.ok || !logsResult.logs) {
+        return { ok: false, error: "Dev server logs unavailable." };
+      }
+      const lines = logsResult.logs.split("\n");
+      const tail = lines.slice(-maxLines).join("\n");
+      return { ok: true, logs: tail, totalLines: lines.length };
     },
   });
 
@@ -346,5 +415,6 @@ export const createTools = (vm: Vm) => {
     deletePathTool,
     commitTool,
     checkAppTool,
+    devServerLogsTool,
   };
 };

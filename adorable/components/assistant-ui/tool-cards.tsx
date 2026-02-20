@@ -366,3 +366,23 @@ export const CheckAppToolCard: ToolCallMessagePartComponent = ({
     </div>
   );
 };
+
+export const DevServerLogsToolCard: ToolCallMessagePartComponent = ({
+  argsText,
+  result,
+  status,
+}) => {
+  const a = parse(argsText);
+  const r = obj(result);
+  const maxLines =
+    typeof a.maxLines === "number" ? `${a.maxLines} lines` : undefined;
+
+  return (
+    <ToolLine
+      label="Dev logs"
+      detail={maxLines ? `last ${maxLines}` : undefined}
+      status={status}
+      expandContent={r.logs ? <DetailBlock data={r.logs} /> : undefined}
+    />
+  );
+};
