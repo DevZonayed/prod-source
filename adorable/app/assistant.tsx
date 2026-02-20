@@ -99,15 +99,7 @@ export const Assistant = () => {
 };
 
 function AppPreview() {
-  // const toolCall = useAuiState(({ thread }) =>
-  //   thread.messages
-  //     .find((message) =>
-  //       message.parts.find((part) => part.type === "tool-call"),
-  //     )
-  //     ?.parts.find((part) => part.type === "tool-call"),
-  // );
-
-  const toolCall = useAuiState(({ thread }) => {
+  const metadata = useAuiState(({ thread }) => {
     for (let i = thread.messages.length - 1; i >= 0; i -= 1) {
       const metadata = thread.messages[i]?.metadata?.custom?.adorable;
       if (metadata) return metadata;
@@ -117,11 +109,11 @@ function AppPreview() {
 
   return (
     <div className="h-full">
-      {toolCall?.url ? (
+      {metadata?.previewUrl ? (
         <div className="grid h-full grid-rows-2">
-          <iframe src={toolCall?.url} className="h-full w-full" />
+          <iframe src={metadata?.previewUrl} className="h-full w-full" />
           <iframe
-            src={`https://${toolCall?.vmId}.vm.freestyle.sh/__console`}
+            src={metadata?.devCommandTerminalUrl}
             className="h-full w-full"
           />
         </div>

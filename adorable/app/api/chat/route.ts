@@ -6,14 +6,17 @@ import {
   tool,
   stepCountIs,
 } from "ai";
-import { freestyle, VmSpec } from "freestyle-sandboxes";
+import { freestyle, Vm, VmSpec } from "freestyle-sandboxes";
 import { z } from "zod";
 import { VmDevServer } from "@freestyle-sh/with-dev-server";
+import { VmPtySession } from "@freestyle-sh/with-pty";
+import { VmWebTerminal } from "@freestyle-sh/with-ttyd";
 
 const TEMPLATE_REPO = "https://github.com/freestyle-sh/freestyle-next";
 const WORKDIR = "/workspace";
 const VM_PORT = 3000;
 const MODEL = "gpt-5-mini";
+const DEV_COMMAND_TERMINAL_PORT = 3010;
 
 type AdorableMetadata = {
   vmId: string;
@@ -49,14 +52,24 @@ ${WORKDIR}/public/vercel.svg
 ${WORKDIR}/public/window.svg
 ${WORKDIR}/tsconfig.json
 
-You can run bash commands to inspect files, install dependencies, and modify code. The dev server automatically reloads when files are changed. If you need to restart the dev server, run systemctl restart adorable-run-dev.service. You can view logs via journalctl -u adorable-run-dev.service -f. Be careful when modifying files not to break the dev server. If it does break, check the logs to debug and fix it.
+You can run bash commands to inspect files, install dependencies, and modify code. The dev server automatically reloads when files are changed. Always commit and push your changes when you finish a task.
 `;
+
+const devCommandPty = new VmPtySession({
+  sessionId: "adorable-dev-command",
+});
 
 const spec = new VmSpec({
   with: {
+    devCommandPty,
     devServer: new VmDevServer({
       workdir: WORKDIR,
       templateRepo: TEMPLATE_REPO,
+      devCommandPty,
+    }),
+    devCommandTerminal: new VmWebTerminal({
+      pty: devCommandPty,
+      port: DEV_COMMAND_TERMINAL_PORT,
     }),
   },
 });
@@ -89,20 +102,29 @@ const createAdorableMetadata = async (): Promise<AdorableMetadata> => {
   });
 
   const domain = `${crypto.randomUUID()}-adorable.style.dev`;
+  const devCommandTerminalDomain = `dev-command-${domain}`;
   console.log("Creating VM with domain:", domain);
 
-  const { vmId } = await freestyle.vms.create({
+  const { vm, vmId } = await freestyle.vms.create({
     snapshot: spec,
-    with: {
-      devServer: new VmDevServer({
-        repo: repoId,
-        workdir: WORKDIR,
-      }),
+    recreate: true,
+    workdir: WORKDIR,
+    git: {
+      repos: [
+        {
+          path: WORKDIR,
+          repo: repoId,
+        },
+      ],
     },
     domains: [
       {
         domain,
         vmPort: VM_PORT,
+      },
+      {
+        domain: devCommandTerminalDomain,
+        vmPort: DEV_COMMAND_TERMINAL_PORT,
       },
     ],
   });
@@ -110,30 +132,29 @@ const createAdorableMetadata = async (): Promise<AdorableMetadata> => {
   return {
     vmId,
     repoId,
-    url: `https://${domain}`,
+    previewUrl: `https://${domain}`,
+    devCommandTerminalUrl: `https://${devCommandTerminalDomain}`,
   };
 };
 
-const createBashTool = (metadata: AdorableMetadata | null) =>
-  tool({
+const createTools = (vm: Vm) => {
+  const bashTool = tool({
     description:
       "Run a bash command inside the Adorable VM and return its output.",
     inputSchema: z.object({
       command: z.string().min(1).describe("The bash command to execute."),
     }),
     execute: async ({ command }) => {
-      const vmId = metadata?.vmId;
-      if (!vmId) {
-        throw new Error("No VM is available to run commands.");
-      }
-
-      const result = await freestyle.vms.ref({ vmId }).exec({
+      const result = vm.exec({
         command,
       });
 
       return result ?? { ok: true };
     },
   });
+
+  return { bashTool };
+};
 
 const createMessageMetadata = (
   metadata: AdorableMetadata | null,
@@ -157,13 +178,23 @@ export async function POST(req: Request) {
     messages.length === 1 ? await createAdorableMetadata() : null;
   const resolvedMetadata = newMetadata ?? persistedMetadata;
 
-  const bashTool = createBashTool(resolvedMetadata);
+  const vmId = resolvedMetadata?.vmId;
+  if (!vmId) {
+    throw new Error("No VM is available to run commands.");
+  }
+
+  let vm = freestyle.vms.ref({
+    vmId,
+    spec: spec,
+  });
+
+  const tools = createTools(vm);
 
   const result = streamText({
     system: SYSTEM_PROMPT,
     model: openai.responses(MODEL),
     messages: await convertToModelMessages(messages),
-    tools: { bash: bashTool },
+    tools,
     stopWhen: stepCountIs(100),
   });
 
