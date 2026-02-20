@@ -10,15 +10,18 @@ import {
   AssistantChatTransport,
 } from "@assistant-ui/react-ai-sdk";
 import { Thread } from "@/components/assistant-ui/thread";
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
 
-import { useState, useCallback, useEffect } from "react";
-import { Loader2Icon, PlusIcon, XIcon } from "lucide-react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  Loader2Icon,
+  PlusIcon,
+  RotateCwIcon,
+  XIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type AdorableMetadata = {
@@ -46,9 +49,6 @@ export const Assistant = () => {
         <div className="flex h-dvh w-full pr-0.5">
           <ThreadListSidebar />
           <SidebarInset>
-            <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
-              <SidebarTrigger />
-            </header>
             <MainContent />
           </SidebarInset>
         </div>
@@ -64,12 +64,7 @@ function MainContent() {
   );
 
   return (
-    <div
-      className={cn(
-        "grid h-[calc(100dvh-3rem)]",
-        !isEmpty ? "grid-cols-2" : "grid-cols-1",
-      )}
-    >
+    <div className={cn("grid h-dvh", !isEmpty ? "grid-cols-2" : "grid-cols-1")}>
       <div className="min-w-0 overflow-hidden">
         <Thread />
       </div>
@@ -85,14 +80,12 @@ function MainContent() {
 function PreviewPlaceholder() {
   return (
     <div className="flex h-full flex-col">
-      {/* Browser chrome */}
-      <div className="flex h-10 shrink-0 items-center gap-2 border-b px-4">
-        <div className="flex gap-1.5">
-          <div className="size-2.5 rounded-full bg-muted-foreground/15" />
-          <div className="size-2.5 rounded-full bg-muted-foreground/15" />
-          <div className="size-2.5 rounded-full bg-muted-foreground/15" />
-        </div>
-        <div className="mx-4 h-6 flex-1 rounded-md bg-muted/50" />
+      {/* Browser toolbar skeleton */}
+      <div className="flex h-10 shrink-0 items-center gap-1.5 border-b bg-muted/20 px-2">
+        <div className="size-6 rounded bg-muted-foreground/8" />
+        <div className="size-6 rounded bg-muted-foreground/8" />
+        <div className="size-6 rounded bg-muted-foreground/8" />
+        <div className="ml-1 h-7 flex-1 rounded-md bg-muted/50" />
       </div>
 
       {/* Page content skeleton */}
@@ -169,6 +162,7 @@ function AppPreview() {
   const [activeTab, setActiveTab] = useState("dev-server");
   const [counter, setCounter] = useState(1);
   const [iframeLoaded, setIframeLoaded] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     setIframeLoaded(false);
@@ -218,26 +212,33 @@ function AppPreview() {
     <div className="flex h-full flex-col overflow-hidden">
       {metadata?.previewUrl ? (
         <>
-          {/* Preview */}
-          <div className="relative h-[70%] min-h-0">
-            {!iframeLoaded && (
-              <div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
-                <div className="flex flex-col items-center gap-3">
-                  <Loader2Icon className="size-6 animate-spin text-muted-foreground/40" />
-                  <p className="text-sm text-muted-foreground/40">
-                    Loading preview…
-                  </p>
-                </div>
-              </div>
-            )}
-            <iframe
-              src={metadata.previewUrl}
-              className={cn(
-                "h-full w-full transition-opacity duration-300",
-                iframeLoaded ? "opacity-100" : "opacity-0",
-              )}
-              onLoad={() => setIframeLoaded(true)}
+          {/* Browser toolbar + Preview */}
+          <div className="relative flex h-[70%] min-h-0 flex-col">
+            <BrowserToolbar
+              previewUrl={metadata.previewUrl}
+              iframeRef={iframeRef}
             />
+            <div className="relative min-h-0 flex-1">
+              {!iframeLoaded && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2Icon className="size-6 animate-spin text-muted-foreground/40" />
+                    <p className="text-sm text-muted-foreground/40">
+                      Loading preview…
+                    </p>
+                  </div>
+                </div>
+              )}
+              <iframe
+                ref={iframeRef}
+                src={metadata.previewUrl}
+                className={cn(
+                  "h-full w-full transition-opacity duration-300",
+                  iframeLoaded ? "opacity-100" : "opacity-0",
+                )}
+                onLoad={() => setIframeLoaded(true)}
+              />
+            </div>
           </div>
 
           {/* Terminal panel */}
@@ -310,13 +311,12 @@ function AppPreview() {
         </>
       ) : (
         <div className="flex h-full flex-col">
-          <div className="flex h-10 shrink-0 items-center gap-2 border-b px-4">
-            <div className="flex gap-1.5">
-              <div className="size-2.5 rounded-full bg-muted-foreground/15" />
-              <div className="size-2.5 rounded-full bg-muted-foreground/15" />
-              <div className="size-2.5 rounded-full bg-muted-foreground/15" />
-            </div>
-            <div className="mx-4 h-6 flex-1 rounded-md bg-muted/50" />
+          {/* Browser toolbar skeleton */}
+          <div className="flex h-10 shrink-0 items-center gap-1.5 border-b bg-muted/20 px-2">
+            <div className="size-6 rounded bg-muted-foreground/8" />
+            <div className="size-6 rounded bg-muted-foreground/8" />
+            <div className="size-6 rounded bg-muted-foreground/8" />
+            <div className="ml-1 h-7 flex-1 rounded-md bg-muted/50" />
           </div>
           <div className="flex flex-1 items-center justify-center">
             <div className="flex flex-col items-center gap-3">
@@ -336,6 +336,114 @@ function AppPreview() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function BrowserToolbar({
+  previewUrl,
+  iframeRef,
+}: {
+  previewUrl: string;
+  iframeRef: React.RefObject<HTMLIFrameElement | null>;
+}) {
+  const [urlValue, setUrlValue] = useState(() => {
+    try {
+      return new URL(previewUrl).pathname;
+    } catch {
+      return "/";
+    }
+  });
+
+  useEffect(() => {
+    try {
+      setUrlValue(new URL(previewUrl).pathname);
+    } catch {
+      setUrlValue("/");
+    }
+  }, [previewUrl]);
+
+  const baseUrl = (() => {
+    try {
+      const u = new URL(previewUrl);
+      return `${u.protocol}//${u.host}`;
+    } catch {
+      return previewUrl;
+    }
+  })();
+
+  const navigate = (path: string) => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    setUrlValue(normalizedPath);
+    iframe.src = `${baseUrl}${normalizedPath}`;
+  };
+
+  const handleReload = () => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    // eslint-disable-next-line no-self-assign
+    iframe.src = iframe.src;
+  };
+
+  const handleBack = () => {
+    try {
+      iframeRef.current?.contentWindow?.history.back();
+    } catch {
+      // cross-origin
+    }
+  };
+
+  const handleForward = () => {
+    try {
+      iframeRef.current?.contentWindow?.history.forward();
+    } catch {
+      // cross-origin
+    }
+  };
+
+  return (
+    <div className="flex h-10 shrink-0 items-center gap-1 border-b bg-muted/20 px-2">
+      <button
+        type="button"
+        onClick={handleBack}
+        className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        title="Back"
+      >
+        <ArrowLeftIcon className="size-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={handleForward}
+        className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        title="Forward"
+      >
+        <ArrowRightIcon className="size-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={handleReload}
+        className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        title="Reload"
+      >
+        <RotateCwIcon className="size-3.5" />
+      </button>
+      <form
+        className="ml-1 flex-1"
+        onSubmit={(e) => {
+          e.preventDefault();
+          navigate(urlValue);
+        }}
+      >
+        <input
+          type="text"
+          value={urlValue}
+          onChange={(e) => setUrlValue(e.target.value)}
+          className="h-7 w-full rounded-md bg-muted/50 px-2.5 text-xs text-foreground transition-colors outline-none focus:bg-muted focus:ring-1 focus:ring-ring"
+          aria-label="URL path"
+        />
+      </form>
     </div>
   );
 }

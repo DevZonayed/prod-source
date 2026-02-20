@@ -2,11 +2,13 @@ import * as React from "react";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { ThreadList } from "@/components/assistant-ui/thread-list";
 
@@ -58,6 +60,9 @@ export function ThreadListSidebar({
       <SidebarContent className="px-2">
         <ThreadList />
       </SidebarContent>
+      <SidebarFooter className="border-t p-2">
+        <SidebarTrigger className="w-full justify-start" />
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );
