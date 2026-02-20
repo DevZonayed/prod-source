@@ -344,3 +344,48 @@ export const CommitToolCard: ToolCallMessagePartComponent = ({
     </div>
   );
 };
+
+export const CheckAppToolCard: ToolCallMessagePartComponent = ({
+  argsText,
+  result,
+  status,
+}) => {
+  const a = parse(argsText);
+  const r = obj(result);
+  const running = status?.type === "running";
+  const path = str(a.path) ?? "/";
+  const isOk = r.ok === true;
+  const statusCode = typeof r.statusCode === "number" ? r.statusCode : null;
+
+  return (
+    <div className="my-0.5 flex items-center gap-2 px-2 py-1 text-sm">
+      {running ? (
+        <CircleDashedIcon className="size-4 shrink-0 animate-spin text-muted-foreground" />
+      ) : isOk ? (
+        <CheckIcon className="size-4 shrink-0 text-green-500" />
+      ) : (
+        <XIcon className="size-4 shrink-0 text-red-500" />
+      )}
+      <span className="font-medium">
+        {running
+          ? "Checking app…"
+          : isOk
+            ? "App is healthy"
+            : "App returned an error"}
+      </span>
+      {!running && statusCode !== null && (
+        <span
+          className={cn(
+            "rounded px-1.5 py-0.5 font-mono text-xs",
+            isOk
+              ? "bg-green-500/10 text-green-500"
+              : "bg-red-500/10 text-red-500",
+          )}
+        >
+          {statusCode}
+        </span>
+      )}
+      <span className="min-w-0 truncate text-muted-foreground">{path}</span>
+    </div>
+  );
+};

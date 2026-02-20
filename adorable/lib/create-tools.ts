@@ -1,7 +1,7 @@
 import { tool } from "ai";
 import { Vm } from "freestyle-sandboxes";
 import { z } from "zod";
-import { WORKDIR } from "./vars";
+import { WORKDIR, VM_PORT } from "./vars";
 
 const normalizeRelativePath = (rawPath: string): string | null => {
   const value = rawPath.trim();
@@ -294,6 +294,45 @@ export const createTools = (vm: Vm) => {
     },
   });
 
+  const checkAppTool = tool({
+    description:
+      "Check if the app is running correctly by making an HTTP request to the dev server. You MUST call this tool before finishing any task to verify the app is not broken. If the status code is not 200, investigate and fix the issue before telling the user you are done.",
+    inputSchema: z
+      .object({
+        path: z
+          .string()
+          .default("/")
+          .describe("The URL path to check (e.g. '/' or '/about')."),
+      })
+      .passthrough(),
+    execute: async ({ path }) => {
+      const urlPath = path?.startsWith("/") ? path : `/${path ?? ""}`;
+      const command = `curl -s -o /dev/null -w '{"statusCode":%{http_code},"totalTime":%{time_total},"url":"%{url_effective}"}' http://localhost:${VM_PORT}${urlPath}`;
+      const result = await runExecCommand(command);
+      try {
+        const info = JSON.parse(result.stdout);
+        const ok = info.statusCode >= 200 && info.statusCode < 400;
+        return {
+          ok,
+          statusCode: info.statusCode,
+          totalTime: info.totalTime,
+          url: info.url,
+          ...(ok
+            ? {}
+            : {
+                error: `App returned HTTP ${info.statusCode}. Investigate the issue before reporting completion.`,
+              }),
+        };
+      } catch {
+        return {
+          ok: false,
+          error: "Failed to reach the dev server. It may not be running.",
+          raw: result.stdout,
+        };
+      }
+    },
+  });
+
   return {
     bashTool,
     readFileTool,
@@ -306,5 +345,6 @@ export const createTools = (vm: Vm) => {
     movePathTool,
     deletePathTool,
     commitTool,
+    checkAppTool,
   };
 };

@@ -8,6 +8,7 @@ import { Reasoning, ReasoningGroup } from "@/components/assistant-ui/reasoning";
 import {
   AppendToFileToolCard,
   BashToolCard,
+  CheckAppToolCard,
   CommitToolCard,
   DeletePathToolCard,
   ListFilesToolCard,
@@ -286,6 +287,7 @@ const AssistantMessage: FC = () => {
                 movePathTool: MovePathToolCard,
                 deletePathTool: DeletePathToolCard,
                 commitTool: CommitToolCard,
+                checkAppTool: CheckAppToolCard,
               },
               Fallback: ToolFallback,
             },
