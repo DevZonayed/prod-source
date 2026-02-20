@@ -6,16 +6,8 @@ import {
   CheckIcon,
   ChevronRightIcon,
   CircleDashedIcon,
-  FileIcon,
-  FileEditIcon,
-  FilePlusIcon,
-  FolderIcon,
-  FolderPlusIcon,
   GitCommitHorizontalIcon,
-  MoveIcon,
-  SearchIcon,
   TerminalIcon,
-  Trash2Icon,
   XIcon,
 } from "lucide-react";
 import { useState } from "react";
@@ -52,11 +44,27 @@ const preview = (v: unknown, max = 12): string | null => {
 /* ------------------------------------------------------------------ */
 
 type ToolLineProps = {
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   label: string;
   detail?: string;
   status?: { type: string; reason?: string };
   expandContent?: React.ReactNode;
+};
+
+const StatusIcon = ({
+  status,
+}: {
+  status?: { type: string; reason?: string };
+}) => {
+  const running = status?.type === "running";
+  const failed = status?.type === "incomplete" && status.reason === "cancelled";
+  if (running)
+    return (
+      <CircleDashedIcon className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
+    );
+  if (failed)
+    return <XIcon className="size-3.5 shrink-0 text-muted-foreground" />;
+  return <CheckIcon className="size-3.5 shrink-0 text-muted-foreground" />;
 };
 
 const ToolLine = ({
@@ -67,7 +75,6 @@ const ToolLine = ({
   expandContent,
 }: ToolLineProps) => {
   const [open, setOpen] = useState(false);
-  const running = status?.type === "running";
   const failed = status?.type === "incomplete" && status.reason === "cancelled";
 
   return (
@@ -76,37 +83,26 @@ const ToolLine = ({
         type="button"
         onClick={() => expandContent && setOpen((v) => !v)}
         className={cn(
-          "group flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm transition-colors hover:bg-muted/60",
+          "group inline-flex max-w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm transition-colors hover:bg-muted/60",
           failed && "text-muted-foreground line-through",
         )}
       >
-        {/* status dot / spinner */}
-        {running ? (
-          <CircleDashedIcon className="size-3 shrink-0 animate-spin text-muted-foreground" />
-        ) : failed ? (
-          <XIcon className="size-3 shrink-0 text-muted-foreground" />
-        ) : (
-          <CheckIcon className="size-3 shrink-0 text-muted-foreground" />
-        )}
+        <span className="flex w-4 shrink-0 items-center justify-center">
+          {icon ?? <StatusIcon status={status} />}
+        </span>
 
-        {/* tool icon */}
-        <span className="shrink-0 text-muted-foreground">{icon}</span>
-
-        {/* label */}
         <span className="shrink-0 font-medium">{label}</span>
 
-        {/* detail (file path, command, etc.) */}
         {detail && (
           <span className="min-w-0 truncate text-muted-foreground">
             {detail}
           </span>
         )}
 
-        {/* expand hint */}
         {expandContent && (
           <ChevronRightIcon
             className={cn(
-              "ml-auto size-3 shrink-0 text-muted-foreground opacity-0 transition-all group-hover:opacity-100",
+              "size-3 shrink-0 text-muted-foreground opacity-0 transition-all group-hover:opacity-100",
               open && "rotate-90",
             )}
           />
@@ -114,7 +110,7 @@ const ToolLine = ({
       </button>
 
       {open && expandContent && (
-        <div className="mt-1 mb-1 ml-9 max-h-64 overflow-auto rounded border bg-muted/30 px-3 py-2">
+        <div className="mt-1 mb-1 ml-7 max-h-64 overflow-auto rounded border bg-muted/30 px-3 py-2">
           {expandContent}
         </div>
       )}
@@ -150,15 +146,31 @@ export const BashToolCard: ToolCallMessagePartComponent = ({
   const r = obj(result);
   const cmd = str(a.command);
   const hasOutput = str(r.stdout) || str(r.stderr);
+  const running = status?.type === "running";
 
   return (
     <ToolLine
-      icon={<TerminalIcon className="size-3.5" />}
+      icon={
+        running ? (
+          <CircleDashedIcon className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
+        ) : (
+          <TerminalIcon className="size-3.5 shrink-0 text-muted-foreground" />
+        )
+      }
       label="Ran"
       detail={cmd}
       status={status}
       expandContent={
-        hasOutput ? <DetailBlock data={r.stdout || r.stderr} /> : undefined
+        cmd ? (
+          <div className="space-y-2">
+            <pre className="text-xs leading-relaxed whitespace-pre-wrap text-foreground">
+              {cmd}
+            </pre>
+            {(str(r.stdout) || str(r.stderr)) && (
+              <DetailBlock data={r.stdout || r.stderr} />
+            )}
+          </div>
+        ) : undefined
       }
     />
   );
@@ -174,7 +186,6 @@ export const ReadFileToolCard: ToolCallMessagePartComponent = ({
 
   return (
     <ToolLine
-      icon={<FileIcon className="size-3.5" />}
       label="Read"
       detail={str(a.file)}
       status={status}
@@ -189,14 +200,7 @@ export const WriteFileToolCard: ToolCallMessagePartComponent = ({
 }) => {
   const a = parse(argsText);
 
-  return (
-    <ToolLine
-      icon={<FileEditIcon className="size-3.5" />}
-      label="Wrote"
-      detail={str(a.file)}
-      status={status}
-    />
-  );
+  return <ToolLine label="Wrote" detail={str(a.file)} status={status} />;
 };
 
 export const ListFilesToolCard: ToolCallMessagePartComponent = ({
@@ -209,7 +213,6 @@ export const ListFilesToolCard: ToolCallMessagePartComponent = ({
 
   return (
     <ToolLine
-      icon={<FolderIcon className="size-3.5" />}
       label="Listed"
       detail={str(a.path)}
       status={status}
@@ -228,7 +231,6 @@ export const SearchFilesToolCard: ToolCallMessagePartComponent = ({
 
   return (
     <ToolLine
-      icon={<SearchIcon className="size-3.5" />}
       label="Searched"
       detail={str(a.query) ? `"${a.query}"` : undefined}
       status={status}
@@ -243,14 +245,7 @@ export const ReplaceInFileToolCard: ToolCallMessagePartComponent = ({
 }) => {
   const a = parse(argsText);
 
-  return (
-    <ToolLine
-      icon={<FileEditIcon className="size-3.5" />}
-      label="Edited"
-      detail={str(a.file)}
-      status={status}
-    />
-  );
+  return <ToolLine label="Edited" detail={str(a.file)} status={status} />;
 };
 
 export const AppendToFileToolCard: ToolCallMessagePartComponent = ({
@@ -259,14 +254,7 @@ export const AppendToFileToolCard: ToolCallMessagePartComponent = ({
 }) => {
   const a = parse(argsText);
 
-  return (
-    <ToolLine
-      icon={<FilePlusIcon className="size-3.5" />}
-      label="Appended"
-      detail={str(a.file)}
-      status={status}
-    />
-  );
+  return <ToolLine label="Appended" detail={str(a.file)} status={status} />;
 };
 
 export const MakeDirectoryToolCard: ToolCallMessagePartComponent = ({
@@ -275,14 +263,7 @@ export const MakeDirectoryToolCard: ToolCallMessagePartComponent = ({
 }) => {
   const a = parse(argsText);
 
-  return (
-    <ToolLine
-      icon={<FolderPlusIcon className="size-3.5" />}
-      label="Created dir"
-      detail={str(a.path)}
-      status={status}
-    />
-  );
+  return <ToolLine label="Created dir" detail={str(a.path)} status={status} />;
 };
 
 export const MovePathToolCard: ToolCallMessagePartComponent = ({
@@ -293,7 +274,6 @@ export const MovePathToolCard: ToolCallMessagePartComponent = ({
 
   return (
     <ToolLine
-      icon={<MoveIcon className="size-3.5" />}
       label="Moved"
       detail={str(a.from) && str(a.to) ? `${a.from} → ${a.to}` : str(a.from)}
       status={status}
@@ -307,14 +287,7 @@ export const DeletePathToolCard: ToolCallMessagePartComponent = ({
 }) => {
   const a = parse(argsText);
 
-  return (
-    <ToolLine
-      icon={<Trash2Icon className="size-3.5" />}
-      label="Deleted"
-      detail={str(a.path)}
-      status={status}
-    />
-  );
+  return <ToolLine label="Deleted" detail={str(a.path)} status={status} />;
 };
 
 export const CommitToolCard: ToolCallMessagePartComponent = ({
@@ -327,12 +300,14 @@ export const CommitToolCard: ToolCallMessagePartComponent = ({
   const message = str(a.message);
 
   return (
-    <div className="my-0.5 flex items-center gap-2 px-2 py-1 text-sm">
-      {running ? (
-        <CircleDashedIcon className="size-4 shrink-0 animate-spin text-muted-foreground" />
-      ) : (
-        <GitCommitHorizontalIcon className="size-4 shrink-0 text-muted-foreground" />
-      )}
+    <div className="my-0.5 inline-flex items-center gap-2 rounded-md px-2 py-1 text-sm">
+      <span className="flex w-4 shrink-0 items-center justify-center">
+        {running ? (
+          <CircleDashedIcon className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
+        ) : (
+          <GitCommitHorizontalIcon className="size-3.5 shrink-0 text-muted-foreground" />
+        )}
+      </span>
       <span className="font-medium">
         {running ? "Committing…" : "Committed"}
       </span>
@@ -358,14 +333,16 @@ export const CheckAppToolCard: ToolCallMessagePartComponent = ({
   const statusCode = typeof r.statusCode === "number" ? r.statusCode : null;
 
   return (
-    <div className="my-0.5 flex items-center gap-2 px-2 py-1 text-sm">
-      {running ? (
-        <CircleDashedIcon className="size-4 shrink-0 animate-spin text-muted-foreground" />
-      ) : isOk ? (
-        <CheckIcon className="size-4 shrink-0 text-green-500" />
-      ) : (
-        <XIcon className="size-4 shrink-0 text-red-500" />
-      )}
+    <div className="my-0.5 inline-flex items-center gap-2 rounded-md px-2 py-1 text-sm">
+      <span className="flex w-4 shrink-0 items-center justify-center">
+        {running ? (
+          <CircleDashedIcon className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
+        ) : isOk ? (
+          <CheckIcon className="size-3.5 shrink-0 text-green-500" />
+        ) : (
+          <XIcon className="size-3.5 shrink-0 text-red-500" />
+        )}
+      </span>
       <span className="font-medium">
         {running
           ? "Checking app…"

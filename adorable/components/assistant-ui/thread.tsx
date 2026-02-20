@@ -27,6 +27,7 @@ import {
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { pickRandom } from "@/lib/suggestions";
 import {
   ActionBarMorePrimitive,
   ActionBarPrimitive,
@@ -50,7 +51,7 @@ import {
   RefreshCwIcon,
   SquareIcon,
 } from "lucide-react";
-import type { FC } from "react";
+import { type FC, useEffect, useState } from "react";
 
 export const Thread: FC = () => {
   return (
@@ -142,34 +143,17 @@ const ThreadWelcome: FC = () => {
   );
 };
 
-const SUGGESTIONS = [
-  {
-    title: "A todo app",
-    label: "with drag-and-drop reordering",
-    prompt: "Build a todo app with drag and drop reordering",
-  },
-  {
-    title: "A weather dashboard",
-    label: "with live city search",
-    prompt:
-      "Build a weather dashboard that lets me search cities and see forecasts",
-  },
-  {
-    title: "A landing page",
-    label: "for a SaaS product",
-    prompt: "Build a modern landing page for a SaaS product",
-  },
-  {
-    title: "A markdown editor",
-    label: "with live preview",
-    prompt: "Build a markdown editor with a live preview pane",
-  },
-] as const;
-
 const ThreadSuggestions: FC = () => {
+  const [picks, setPicks] = useState<ReturnType<typeof pickRandom>>([]);
+  useEffect(() => {
+    setPicks(pickRandom(4));
+  }, []);
+
+  if (picks.length === 0) return null;
+
   return (
     <div className="aui-thread-welcome-suggestions grid w-full grid-cols-2 gap-2 pb-4">
-      {SUGGESTIONS.map((suggestion, index) => (
+      {picks.map((suggestion, index) => (
         <div
           key={suggestion.prompt}
           className="aui-thread-welcome-suggestion-display animate-in duration-300 fill-mode-both fade-in slide-in-from-bottom-2"

@@ -172,9 +172,9 @@ export const ToolCallGroup: FC<
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-sm text-muted-foreground transition-colors hover:bg-muted/60"
+        className="inline-flex max-w-full items-center gap-1.5 rounded px-2 py-1 text-left text-sm text-muted-foreground transition-colors hover:bg-muted/60"
       >
-        <CheckIcon className="size-3 shrink-0" />
+        <CheckIcon className="size-3.5 shrink-0" />
         <span className="truncate">{summary}</span>
         <ChevronRightIcon
           className={cn(

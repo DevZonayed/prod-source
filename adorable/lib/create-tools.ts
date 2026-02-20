@@ -286,10 +286,10 @@ export const createTools = (vm: Vm) => {
         message: z.string().min(1).describe("Commit message."),
       })
       .passthrough(),
-    execute: async ({ message, authorName, authorEmail }) => {
+    execute: async ({ message }) => {
       const gitCommand = `git -C ${shellQuote(WORKDIR)} commit -am ${shellQuote(
         message,
-      )} --author=${shellQuote(`${authorName} <${authorEmail}>`)}`;
+      )}`;
       return runExecCommand(gitCommand);
     },
   });
