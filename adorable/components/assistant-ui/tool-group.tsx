@@ -1,16 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import {
-  CheckIcon,
-  ChevronRightIcon,
-  FileEditIcon,
-  FileIcon,
-  FolderIcon,
-  SearchIcon,
-  TerminalIcon,
-  WrenchIcon,
-} from "lucide-react";
+import { CheckIcon, ChevronRightIcon } from "lucide-react";
 import { type FC, type PropsWithChildren, useState } from "react";
 
 /* ------------------------------------------------------------------ */
@@ -74,134 +65,72 @@ export const groupConsecutiveToolCalls: GroupingFunction = (parts) => {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Summarisation helpers                                             */
+/*  Single-line summary                                               */
 /* ------------------------------------------------------------------ */
 
-type SummaryItem = { icon: React.ReactNode; text: string };
+const summarize = (tools: ToolInfo[]): string => {
+  if (tools.length === 0) return "Ran tools";
 
-const buildSummary = (tools: ToolInfo[]): SummaryItem[] => {
-  const items: SummaryItem[] = [];
-
-  const reads: string[] = [];
-  const writes: string[] = [];
-  const edits: string[] = [];
-  const searches: string[] = [];
-  const commands: string[] = [];
-  const listings: string[] = [];
-  const other: string[] = [];
+  // Count by category
+  let reads = 0,
+    writes = 0,
+    edits = 0,
+    searches = 0,
+    cmds = 0,
+    other = 0;
+  let singleFile: string | undefined;
 
   for (const t of tools) {
     const file = typeof t.args.file === "string" ? t.args.file : undefined;
-    const path = typeof t.args.path === "string" ? t.args.path : undefined;
-
     switch (t.toolName) {
       case "readFileTool":
-        reads.push(file ?? "file");
+        reads++;
         break;
       case "writeFileTool":
-        writes.push(file ?? "file");
+        writes++;
+        singleFile ??= file;
         break;
       case "replaceInFileTool":
       case "appendToFileTool":
-        edits.push(file ?? "file");
+        edits++;
+        singleFile ??= file;
         break;
       case "searchFilesTool":
-        searches.push(
-          typeof t.args.query === "string" ? `"${t.args.query}"` : "files",
-        );
+        searches++;
         break;
       case "listFilesTool":
-        listings.push(path ?? ".");
+        reads++;
         break;
       case "bashTool":
-        commands.push(
-          typeof t.args.command === "string"
-            ? t.args.command.split("\n")[0]!
-            : "command",
-        );
-        break;
-      case "makeDirectoryTool":
-      case "movePathTool":
-      case "deletePathTool":
-        other.push(
-          t.toolName
-            .replace(/Tool$/, "")
-            .replace(/([A-Z])/g, " $1")
-            .trim()
-            .toLowerCase(),
-        );
+        cmds++;
         break;
       default:
-        other.push(t.toolName);
+        other++;
+        break;
     }
   }
 
-  if (reads.length > 0) {
-    items.push({
-      icon: <FileIcon className="size-3.5" />,
-      text:
-        reads.length === 1 ? `Read ${reads[0]}` : `Read ${reads.length} files`,
-    });
+  // Build compact fragments
+  const parts: string[] = [];
+
+  const modified = writes + edits;
+  if (modified === 1 && singleFile) {
+    parts.push(`Updated ${singleFile}`);
+  } else if (modified > 0) {
+    parts.push(`Updated ${modified} file${modified > 1 ? "s" : ""}`);
   }
 
-  if (writes.length > 0) {
-    items.push({
-      icon: <FileEditIcon className="size-3.5" />,
-      text:
-        writes.length === 1
-          ? `Wrote ${writes[0]}`
-          : `Updated ${writes.length} files`,
-    });
-  }
+  if (reads > 0) parts.push(`read ${reads} file${reads > 1 ? "s" : ""}`);
+  if (searches > 0)
+    parts.push(`searched ${searches} quer${searches > 1 ? "ies" : "y"}`);
+  if (cmds > 0) parts.push(`ran ${cmds} command${cmds > 1 ? "s" : ""}`);
+  if (other > 0) parts.push(`${other} other`);
 
-  if (edits.length > 0) {
-    items.push({
-      icon: <FileEditIcon className="size-3.5" />,
-      text:
-        edits.length === 1
-          ? `Edited ${edits[0]}`
-          : `Edited ${edits.length} files`,
-    });
-  }
+  if (parts.length === 0) return `Ran ${tools.length} tools`;
 
-  if (searches.length > 0) {
-    items.push({
-      icon: <SearchIcon className="size-3.5" />,
-      text:
-        searches.length === 1
-          ? `Searched ${searches[0]}`
-          : `Searched ${searches.length} queries`,
-    });
-  }
-
-  if (listings.length > 0) {
-    items.push({
-      icon: <FolderIcon className="size-3.5" />,
-      text:
-        listings.length === 1
-          ? `Listed ${listings[0]}`
-          : `Listed ${listings.length} directories`,
-    });
-  }
-
-  if (commands.length > 0) {
-    items.push({
-      icon: <TerminalIcon className="size-3.5" />,
-      text:
-        commands.length === 1
-          ? `Ran ${commands[0]}`
-          : `Ran ${commands.length} commands`,
-    });
-  }
-
-  if (other.length > 0) {
-    items.push({
-      icon: <WrenchIcon className="size-3.5" />,
-      text: other.length === 1 ? other[0]! : `${other.length} other operations`,
-    });
-  }
-
-  return items;
+  // Capitalize first fragment, join with ", "
+  parts[0] = parts[0]!.charAt(0).toUpperCase() + parts[0]!.slice(1);
+  return parts.join(", ");
 };
 
 /* ------------------------------------------------------------------ */
@@ -229,32 +158,20 @@ export const ToolCallGroup: FC<
     // fallback
   }
 
-  const summaryItems = buildSummary(tools);
+  const summary = summarize(tools);
 
   return (
-    <div className="my-1">
+    <div className="my-0.5">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted/60"
+        className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-sm text-muted-foreground transition-colors hover:bg-muted/60"
       >
-        <CheckIcon className="size-3 shrink-0 text-muted-foreground" />
-
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5">
-          {summaryItems.map((item, i) => (
-            <span
-              key={i}
-              className="inline-flex items-center gap-1.5 text-muted-foreground"
-            >
-              {item.icon}
-              <span className="truncate">{item.text}</span>
-            </span>
-          ))}
-        </div>
-
+        <CheckIcon className="size-3 shrink-0" />
+        <span className="truncate">{summary}</span>
         <ChevronRightIcon
           className={cn(
-            "ml-auto size-3 shrink-0 text-muted-foreground transition-transform",
+            "ml-auto size-3 shrink-0 transition-transform",
             open && "rotate-90",
           )}
         />

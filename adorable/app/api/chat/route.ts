@@ -82,7 +82,7 @@ const createAdorableMetadata = async (): Promise<AdorableMetadata> => {
   const devCommandTerminalDomain = `dev-command-${domain}`;
   console.log("Creating VM with domain:", domain);
 
-  const { vm, vmId } = await freestyle.vms.create({
+  const { vmId } = await freestyle.vms.create({
     snapshot: spec,
     recreate: true,
     workdir: WORKDIR,
@@ -93,6 +93,12 @@ const createAdorableMetadata = async (): Promise<AdorableMetadata> => {
           repo: repoId,
         },
       ],
+      config: {
+        user: {
+          name: "Adorable",
+          email: "adorable@freestyle.sh",
+        },
+      },
     },
     domains: [
       {

@@ -278,6 +278,22 @@ export const createTools = (vm: Vm) => {
     },
   });
 
+  const commitTool = tool({
+    description:
+      "Stage all current changes, commit them, and push them to the remote repository. You should use this at any point you think the user would have value returning to. Always commit and push your changes when you finish a task.",
+    inputSchema: z
+      .object({
+        message: z.string().min(1).describe("Commit message."),
+      })
+      .passthrough(),
+    execute: async ({ message, authorName, authorEmail }) => {
+      const gitCommand = `git -C ${shellQuote(WORKDIR)} commit -am ${shellQuote(
+        message,
+      )} --author=${shellQuote(`${authorName} <${authorEmail}>`)}`;
+      return runExecCommand(gitCommand);
+    },
+  });
+
   return {
     bashTool,
     readFileTool,
@@ -289,5 +305,6 @@ export const createTools = (vm: Vm) => {
     makeDirectoryTool,
     movePathTool,
     deletePathTool,
+    commitTool,
   };
 };
