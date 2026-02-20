@@ -64,15 +64,23 @@ function MainContent() {
   );
 
   return (
-    <div className={cn("grid h-dvh", !isEmpty ? "grid-cols-2" : "grid-cols-1")}>
+    <div
+      className="grid h-dvh transition-[grid-template-columns] duration-500 ease-in-out"
+      style={{
+        gridTemplateColumns: !isEmpty ? "1fr 1fr" : "1fr 0fr",
+      }}
+    >
       <div className="min-w-0 overflow-hidden">
         <Thread />
       </div>
-      {!isEmpty && (
-        <div className="min-w-0 animate-in overflow-hidden border-l duration-300 fade-in slide-in-from-right-2">
-          {hasPreview ? <AppPreview /> : <PreviewPlaceholder />}
-        </div>
-      )}
+      <div
+        className={cn(
+          "min-w-0 overflow-hidden border-l transition-opacity duration-500",
+          !isEmpty ? "opacity-100" : "pointer-events-none opacity-0",
+        )}
+      >
+        {!isEmpty && (hasPreview ? <AppPreview /> : <PreviewPlaceholder />)}
+      </div>
     </div>
   );
 }

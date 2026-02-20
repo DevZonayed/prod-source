@@ -102,37 +102,37 @@ const ThreadWelcome: FC = () => {
   return (
     <div className="aui-thread-welcome-root mx-auto my-auto flex w-full max-w-(--thread-max-width) grow flex-col">
       <div className="aui-thread-welcome-center flex w-full grow flex-col items-center justify-center">
-        <div className="aui-thread-welcome-message flex size-full flex-col justify-center px-4">
+        <div className="aui-thread-welcome-message flex flex-col items-center justify-center px-4 text-center">
           <svg
             viewBox="0 0 347 280"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
-            className="mb-5 h-10 w-auto animate-in duration-300 fade-in"
+            className="mb-6 h-12 w-auto animate-in duration-500 fade-in"
           >
             <path
               d="M70 267V235.793C37.4932 229.296 13 200.594 13 166.177C13 134.93 33.1885 108.399 61.2324 98.9148C61.9277 51.3467 100.705 13 148.438 13C183.979 13 214.554 34.2582 228.143 64.7527C234.182 63.4301 240.454 62.733 246.89 62.733C295.058 62.733 334.105 101.781 334.105 149.949C334.105 182.845 315.893 211.488 289 226.343V267"
-              className="stroke-foreground/20"
+              className="stroke-foreground/15"
               strokeWidth="25"
               strokeLinecap="round"
             />
             <path
               d="M146 237V267"
-              className="stroke-foreground/20"
+              className="stroke-foreground/15"
               strokeWidth="25"
               strokeLinecap="round"
             />
             <path
               d="M215 237V267"
-              className="stroke-foreground/20"
+              className="stroke-foreground/15"
               strokeWidth="25"
               strokeLinecap="round"
             />
           </svg>
-          <h1 className="aui-thread-welcome-message-inner animate-in text-2xl font-semibold duration-200 fade-in slide-in-from-bottom-1">
+          <h1 className="aui-thread-welcome-message-inner animate-in text-3xl font-semibold tracking-tight duration-300 fade-in slide-in-from-bottom-2">
             What do you want to build?
           </h1>
-          <p className="aui-thread-welcome-message-inner animate-in text-lg text-muted-foreground delay-75 duration-200 fade-in slide-in-from-bottom-1">
-            Describe your app and I&apos;ll create it for you.
+          <p className="aui-thread-welcome-message-inner mt-2 animate-in text-base text-muted-foreground delay-75 duration-300 fade-in slide-in-from-bottom-2">
+            Describe an app and Adorable will build it for you.
           </p>
         </div>
       </div>
@@ -144,29 +144,40 @@ const ThreadWelcome: FC = () => {
 const SUGGESTIONS = [
   {
     title: "A todo app",
-    label: "with drag and drop",
+    label: "with drag-and-drop reordering",
     prompt: "Build a todo app with drag and drop reordering",
+  },
+  {
+    title: "A weather dashboard",
+    label: "with live city search",
+    prompt:
+      "Build a weather dashboard that lets me search cities and see forecasts",
   },
   {
     title: "A landing page",
     label: "for a SaaS product",
     prompt: "Build a modern landing page for a SaaS product",
   },
+  {
+    title: "A markdown editor",
+    label: "with live preview",
+    prompt: "Build a markdown editor with a live preview pane",
+  },
 ] as const;
 
 const ThreadSuggestions: FC = () => {
   return (
-    <div className="aui-thread-welcome-suggestions grid w-full gap-2 pb-4 @md:grid-cols-2">
+    <div className="aui-thread-welcome-suggestions grid w-full grid-cols-2 gap-2 pb-4">
       {SUGGESTIONS.map((suggestion, index) => (
         <div
           key={suggestion.prompt}
-          className="aui-thread-welcome-suggestion-display animate-in duration-200 fill-mode-both fade-in slide-in-from-bottom-2 nth-[n+3]:hidden @md:nth-[n+3]:block"
-          style={{ animationDelay: `${100 + index * 50}ms` }}
+          className="aui-thread-welcome-suggestion-display animate-in duration-300 fill-mode-both fade-in slide-in-from-bottom-2"
+          style={{ animationDelay: `${150 + index * 75}ms` }}
         >
           <ThreadPrimitive.Suggestion prompt={suggestion.prompt} send asChild>
             <Button
               variant="ghost"
-              className="aui-thread-welcome-suggestion h-auto w-full flex-wrap items-start justify-start gap-1 rounded-2xl border px-4 py-3 text-left text-sm transition-colors hover:bg-muted @md:flex-col"
+              className="aui-thread-welcome-suggestion h-auto w-full flex-col items-start justify-start gap-0.5 rounded-xl border px-4 py-3 text-left text-sm transition-colors hover:bg-muted"
               aria-label={suggestion.prompt}
             >
               <span className="aui-thread-welcome-suggestion-text-1 font-medium">
