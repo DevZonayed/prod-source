@@ -16,6 +16,7 @@ import {
   DEV_COMMAND_TERMINAL_PORT,
   TEMPLATE_REPO,
   MODEL,
+  ADDITIONAL_TERMINALS_PORT,
 } from "@/lib/vars";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt";
 
@@ -24,6 +25,7 @@ type AdorableMetadata = {
   repoId: string;
   previewUrl: string;
   devCommandTerminalUrl: string;
+  additionalTerminalsUrl: string;
 };
 
 type MessageMetadata = {
@@ -47,6 +49,10 @@ const spec = new VmSpec({
     devCommandTerminal: new VmWebTerminal({
       pty: devCommandPty,
       port: DEV_COMMAND_TERMINAL_PORT,
+    }),
+    additionalTerminals: new VmWebTerminal({
+      cwd: WORKDIR,
+      port: ADDITIONAL_TERMINALS_PORT,
     }),
   },
 });
@@ -80,6 +86,7 @@ const createAdorableMetadata = async (): Promise<AdorableMetadata> => {
 
   const domain = `${crypto.randomUUID()}-adorable.style.dev`;
   const devCommandTerminalDomain = `dev-command-${domain}`;
+  const additionalTerminalsDomain = `terminals-${domain}`;
   console.log("Creating VM with domain:", domain);
 
   const { vmId } = await freestyle.vms.create({
@@ -109,6 +116,10 @@ const createAdorableMetadata = async (): Promise<AdorableMetadata> => {
         domain: devCommandTerminalDomain,
         vmPort: DEV_COMMAND_TERMINAL_PORT,
       },
+      {
+        domain: additionalTerminalsDomain,
+        vmPort: ADDITIONAL_TERMINALS_PORT,
+      },
     ],
   });
 
@@ -117,6 +128,7 @@ const createAdorableMetadata = async (): Promise<AdorableMetadata> => {
     repoId,
     previewUrl: `https://${domain}`,
     devCommandTerminalUrl: `https://${devCommandTerminalDomain}`,
+    additionalTerminalsUrl: `https://${additionalTerminalsDomain}`,
   };
 };
 
