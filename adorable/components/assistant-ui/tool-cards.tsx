@@ -11,6 +11,7 @@ import {
   FilePlusIcon,
   FolderIcon,
   FolderPlusIcon,
+  GitCommitHorizontalIcon,
   MoveIcon,
   SearchIcon,
   TerminalIcon,
@@ -313,5 +314,33 @@ export const DeletePathToolCard: ToolCallMessagePartComponent = ({
       detail={str(a.path)}
       status={status}
     />
+  );
+};
+
+export const CommitToolCard: ToolCallMessagePartComponent = ({
+  argsText,
+  result,
+  status,
+}) => {
+  const a = parse(argsText);
+  const running = status?.type === "running";
+  const message = str(a.message);
+
+  return (
+    <div className="my-0.5 flex items-center gap-2 px-2 py-1 text-sm">
+      {running ? (
+        <CircleDashedIcon className="size-4 shrink-0 animate-spin text-muted-foreground" />
+      ) : (
+        <GitCommitHorizontalIcon className="size-4 shrink-0 text-muted-foreground" />
+      )}
+      <span className="font-medium">
+        {running ? "Committing…" : "Committed"}
+      </span>
+      {message && (
+        <span className="min-w-0 truncate text-muted-foreground">
+          {message}
+        </span>
+      )}
+    </div>
   );
 };

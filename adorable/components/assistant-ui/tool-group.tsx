@@ -29,9 +29,16 @@ export const groupConsecutiveToolCalls: GroupingFunction = (parts) => {
   let currentToolIndices: number[] | null = null;
   let currentToolInfos: ToolInfo[] | null = null;
 
+  // Tools that should never be grouped
+  const UNGROUPED_TOOLS = new Set(["commitTool"]);
+
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i];
-    if (part && part.type === "tool-call") {
+    if (
+      part &&
+      part.type === "tool-call" &&
+      !UNGROUPED_TOOLS.has(part.toolName ?? "")
+    ) {
       if (!currentToolIndices) {
         currentToolIndices = [];
         currentToolInfos = [];
