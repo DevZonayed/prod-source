@@ -2,15 +2,13 @@ import * as React from "react";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarRail,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { ThreadList } from "@/components/assistant-ui/thread-list";
+import { ThreadListPrimitive } from "@assistant-ui/react";
+import { PlusIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const AdorableLogo = () => (
   <svg
@@ -45,24 +43,23 @@ export function ThreadListSidebar({
 }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar {...props}>
-      <SidebarHeader className="mb-2 border-b">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg">
-              <div className="flex aspect-square size-8 items-center justify-center">
-                <AdorableLogo />
-              </div>
-              <span className="text-base font-semibold">Adorable</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+      <SidebarHeader className="relative border-b px-3 py-2.5">
+        <ThreadListPrimitive.New asChild>
+          <Button
+            variant="ghost"
+            className="flex h-9 w-full items-center justify-between gap-2 rounded-lg px-2.5 text-muted-foreground hover:text-foreground"
+          >
+            <span className="flex items-center gap-2">
+              <AdorableLogo />
+              <span className="text-[13px] font-medium">New Thread</span>
+            </span>
+            <PlusIcon className="size-3.5" />
+          </Button>
+        </ThreadListPrimitive.New>
       </SidebarHeader>
-      <SidebarContent className="px-2">
+      <SidebarContent className="px-1.5 pt-1.5">
         <ThreadList />
       </SidebarContent>
-      <SidebarFooter className="border-t p-2">
-        <SidebarTrigger className="w-full justify-start" />
-      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );

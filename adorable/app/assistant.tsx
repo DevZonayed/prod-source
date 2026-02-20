@@ -10,7 +10,12 @@ import {
   AssistantChatTransport,
 } from "@assistant-ui/react-ai-sdk";
 import { Thread } from "@/components/assistant-ui/thread";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+  useSidebar,
+} from "@/components/ui/sidebar";
 import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
 
 import { useState, useCallback, useEffect, useRef } from "react";
@@ -62,6 +67,15 @@ function MainContent() {
   const hasPreview = useAuiState(({ thread }) =>
     thread.messages.some((message) => message.metadata?.custom?.adorable),
   );
+  const { setOpen, isMobile } = useSidebar();
+  const wasEmptyRef = useRef(isEmpty);
+
+  useEffect(() => {
+    if (wasEmptyRef.current && !isEmpty && !isMobile) {
+      setOpen(false);
+    }
+    wasEmptyRef.current = isEmpty;
+  }, [isEmpty, isMobile, setOpen]);
 
   return (
     <div
@@ -70,7 +84,8 @@ function MainContent() {
         gridTemplateColumns: !isEmpty ? "1fr 1fr" : "1fr 0fr",
       }}
     >
-      <div className="min-w-0 overflow-hidden">
+      <div className="relative min-w-0 overflow-hidden">
+        <SidebarTrigger className="absolute top-2.5 left-2.5 z-10" />
         <Thread />
       </div>
       <div
