@@ -104,10 +104,10 @@ const ThreadWelcome: FC = () => {
       <div className="aui-thread-welcome-center flex w-full grow flex-col items-center justify-center">
         <div className="aui-thread-welcome-message flex size-full flex-col justify-center px-4">
           <h1 className="aui-thread-welcome-message-inner animate-in text-2xl font-semibold duration-200 fade-in slide-in-from-bottom-1">
-            Hello there!
+            What do you want to build?
           </h1>
-          <p className="aui-thread-welcome-message-inner animate-in text-xl text-muted-foreground delay-75 duration-200 fade-in slide-in-from-bottom-1">
-            How can I help you today?
+          <p className="aui-thread-welcome-message-inner animate-in text-lg text-muted-foreground delay-75 duration-200 fade-in slide-in-from-bottom-1">
+            Describe your app and I&apos;ll create it for you.
           </p>
         </div>
       </div>
@@ -118,14 +118,14 @@ const ThreadWelcome: FC = () => {
 
 const SUGGESTIONS = [
   {
-    title: "What's the weather",
-    label: "in San Francisco?",
-    prompt: "What's the weather in San Francisco?",
+    title: "A todo app",
+    label: "with drag and drop",
+    prompt: "Build a todo app with drag and drop reordering",
   },
   {
-    title: "Explain React hooks",
-    label: "like useState and useEffect",
-    prompt: "Explain React hooks like useState and useEffect",
+    title: "A landing page",
+    label: "for a SaaS product",
+    prompt: "Build a modern landing page for a SaaS product",
   },
 ] as const;
 
