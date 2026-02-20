@@ -27,6 +27,11 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 
+type AdorableMetadata = {
+  previewUrl?: string;
+  devCommandTerminalUrl?: string;
+};
+
 const cloud = new AssistantCloud({
   baseUrl: process.env["NEXT_PUBLIC_ASSISTANT_BASE_URL"]!,
   anonymous: true,
@@ -99,9 +104,11 @@ export const Assistant = () => {
 };
 
 function AppPreview() {
-  const metadata = useAuiState(({ thread }) => {
+  const metadata = useAuiState<AdorableMetadata | undefined>(({ thread }) => {
     for (let i = thread.messages.length - 1; i >= 0; i -= 1) {
-      const metadata = thread.messages[i]?.metadata?.custom?.adorable;
+      const metadata = thread.messages[i]?.metadata?.custom?.adorable as
+        | AdorableMetadata
+        | undefined;
       if (metadata) return metadata;
     }
     return undefined;

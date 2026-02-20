@@ -3,25 +3,27 @@ import {
   streamText,
   convertToModelMessages,
   type UIMessage,
-  tool,
   stepCountIs,
 } from "ai";
-import { freestyle, Vm, VmSpec } from "freestyle-sandboxes";
-import { z } from "zod";
+import { freestyle, VmSpec } from "freestyle-sandboxes";
 import { VmDevServer } from "@freestyle-sh/with-dev-server";
 import { VmPtySession } from "@freestyle-sh/with-pty";
 import { VmWebTerminal } from "@freestyle-sh/with-ttyd";
-
-const TEMPLATE_REPO = "https://github.com/freestyle-sh/freestyle-next";
-const WORKDIR = "/workspace";
-const VM_PORT = 3000;
-const MODEL = "gpt-5-mini";
-const DEV_COMMAND_TERMINAL_PORT = 3010;
+import { createTools as createVmTools } from "@/lib/create-tools";
+import {
+  VM_PORT,
+  WORKDIR,
+  DEV_COMMAND_TERMINAL_PORT,
+  TEMPLATE_REPO,
+  MODEL,
+} from "@/lib/vars";
+import { SYSTEM_PROMPT } from "@/lib/system-prompt";
 
 type AdorableMetadata = {
   vmId: string;
   repoId: string;
-  url: string;
+  previewUrl: string;
+  devCommandTerminalUrl: string;
 };
 
 type MessageMetadata = {
@@ -29,31 +31,6 @@ type MessageMetadata = {
     adorable?: AdorableMetadata;
   };
 };
-
-const SYSTEM_PROMPT = `
-You are Adorable, an AI app builder. There is a default Next.js app already set up in ${WORKDIR} and running inside a VM on port ${VM_PORT}.
-
-Here are the files currently there:
-${WORKDIR}/README.md
-${WORKDIR}/app/favicon.ico
-${WORKDIR}/app/globals.css
-${WORKDIR}/app/layout.tsx
-${WORKDIR}/app/page.tsx
-${WORKDIR}/eslint.config.mjs
-${WORKDIR}/next-env.d.ts
-${WORKDIR}/next.config.ts
-${WORKDIR}/package-lock.json
-${WORKDIR}/package.json
-${WORKDIR}/postcss.config.mjs
-${WORKDIR}/public/file.svg
-${WORKDIR}/public/globe.svg
-${WORKDIR}/public/next.svg
-${WORKDIR}/public/vercel.svg
-${WORKDIR}/public/window.svg
-${WORKDIR}/tsconfig.json
-
-You can run bash commands to inspect files, install dependencies, and modify code. The dev server automatically reloads when files are changed. Always commit and push your changes when you finish a task.
-`;
 
 const devCommandPty = new VmPtySession({
   sessionId: "adorable-dev-command",
@@ -137,25 +114,6 @@ const createAdorableMetadata = async (): Promise<AdorableMetadata> => {
   };
 };
 
-const createTools = (vm: Vm) => {
-  const bashTool = tool({
-    description:
-      "Run a bash command inside the Adorable VM and return its output.",
-    inputSchema: z.object({
-      command: z.string().min(1).describe("The bash command to execute."),
-    }),
-    execute: async ({ command }) => {
-      const result = vm.exec({
-        command,
-      });
-
-      return result ?? { ok: true };
-    },
-  });
-
-  return { bashTool };
-};
-
 const createMessageMetadata = (
   metadata: AdorableMetadata | null,
 ): (({ part }: { part: { type: string } }) => MessageMetadata | undefined) => {
@@ -188,7 +146,7 @@ export async function POST(req: Request) {
     spec: spec,
   });
 
-  const tools = createTools(vm);
+  const tools = createVmTools(vm);
 
   const result = streamText({
     system: SYSTEM_PROMPT,

@@ -5,6 +5,18 @@ import {
 } from "@/components/assistant-ui/attachment";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { Reasoning, ReasoningGroup } from "@/components/assistant-ui/reasoning";
+import {
+  AppendToFileToolCard,
+  BashToolCard,
+  DeletePathToolCard,
+  ListFilesToolCard,
+  MakeDirectoryToolCard,
+  MovePathToolCard,
+  ReadFileToolCard,
+  ReplaceInFileToolCard,
+  SearchFilesToolCard,
+  WriteFileToolCard,
+} from "@/components/assistant-ui/tool-cards";
 import { ToolFallback } from "@/components/assistant-ui/tool-fallback";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { Button } from "@/components/ui/button";
@@ -219,7 +231,19 @@ const AssistantMessage: FC = () => {
             Text: MarkdownText,
             Reasoning,
             ReasoningGroup,
-            tools: { Fallback: ToolFallback },
+            tools: {
+              bashTool: BashToolCard,
+              readFileTool: ReadFileToolCard,
+              writeFileTool: WriteFileToolCard,
+              listFilesTool: ListFilesToolCard,
+              searchFilesTool: SearchFilesToolCard,
+              replaceInFileTool: ReplaceInFileToolCard,
+              appendToFileTool: AppendToFileToolCard,
+              makeDirectoryTool: MakeDirectoryToolCard,
+              movePathTool: MovePathToolCard,
+              deletePathTool: DeletePathToolCard,
+              Fallback: ToolFallback,
+            } as unknown as { Fallback: typeof ToolFallback },
           }}
         />
         <MessageError />
