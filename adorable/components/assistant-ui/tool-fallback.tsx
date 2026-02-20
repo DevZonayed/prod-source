@@ -1,12 +1,14 @@
+"use client";
+
 import type { ToolCallMessagePartComponent } from "@assistant-ui/react";
 import {
   CheckIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
-  XCircleIcon,
+  ChevronRightIcon,
+  CircleDashedIcon,
+  WrenchIcon,
+  XIcon,
 } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export const ToolFallback: ToolCallMessagePartComponent = ({
@@ -15,71 +17,51 @@ export const ToolFallback: ToolCallMessagePartComponent = ({
   result,
   status,
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState(true);
-
-  const isCancelled =
-    status?.type === "incomplete" && status.reason === "cancelled";
-  const cancelledReason =
-    isCancelled && status.error
-      ? typeof status.error === "string"
-        ? status.error
-        : JSON.stringify(status.error)
-      : null;
+  const [open, setOpen] = useState(false);
+  const running = status?.type === "running";
+  const failed = status?.type === "incomplete" && status.reason === "cancelled";
 
   return (
-    <div
-      className={cn(
-        "aui-tool-fallback-root mb-4 flex w-full flex-col gap-3 rounded-lg border py-3",
-        isCancelled && "border-muted-foreground/30 bg-muted/30",
-      )}
-    >
-      <div className="aui-tool-fallback-header flex items-center gap-2 px-4">
-        {isCancelled ? (
-          <XCircleIcon className="aui-tool-fallback-icon size-4 text-muted-foreground" />
-        ) : (
-          <CheckIcon className="aui-tool-fallback-icon size-4" />
+    <div className="my-0.5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          "group flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm transition-colors hover:bg-muted/60",
+          failed && "text-muted-foreground line-through",
         )}
-        <p
+      >
+        {running ? (
+          <CircleDashedIcon className="size-3 shrink-0 animate-spin text-muted-foreground" />
+        ) : failed ? (
+          <XIcon className="size-3 shrink-0 text-muted-foreground" />
+        ) : (
+          <CheckIcon className="size-3 shrink-0 text-muted-foreground" />
+        )}
+        <WrenchIcon className="size-3.5 shrink-0 text-muted-foreground" />
+        <span className="shrink-0 font-medium">{toolName}</span>
+        <ChevronRightIcon
           className={cn(
-            "aui-tool-fallback-title grow",
-            isCancelled && "text-muted-foreground line-through",
+            "ml-auto size-3 shrink-0 text-muted-foreground opacity-0 transition-all group-hover:opacity-100",
+            open && "rotate-90",
           )}
-        >
-          {isCancelled ? "Cancelled tool: " : "Used tool: "}
-          <b>{toolName}</b>
-        </p>
-        <Button onClick={() => setIsCollapsed(!isCollapsed)}>
-          {isCollapsed ? <ChevronUpIcon /> : <ChevronDownIcon />}
-        </Button>
-      </div>
-      {!isCollapsed && (
-        <div className="aui-tool-fallback-content flex flex-col gap-2 border-t pt-2">
-          {cancelledReason && (
-            <div className="aui-tool-fallback-cancelled-root px-4">
-              <p className="aui-tool-fallback-cancelled-header font-semibold text-muted-foreground">
-                Cancelled reason:
-              </p>
-              <p className="aui-tool-fallback-cancelled-reason text-muted-foreground">
-                {cancelledReason}
-              </p>
-            </div>
-          )}
-          <div
-            className={cn(
-              "aui-tool-fallback-args-root px-4",
-              isCancelled && "opacity-60",
-            )}
-          >
-            <pre className="aui-tool-fallback-args-value whitespace-pre-wrap">
-              {argsText}
-            </pre>
+        />
+      </button>
+
+      {open && (
+        <div className="mt-1 mb-1 ml-9 flex max-h-64 flex-col gap-2 overflow-auto rounded border bg-muted/30 px-3 py-2">
+          <div>
+            <p className="mb-0.5 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+              Input
+            </p>
+            <pre className="text-xs whitespace-pre-wrap">{argsText}</pre>
           </div>
-          {!isCancelled && result !== undefined && (
-            <div className="aui-tool-fallback-result-root border-t border-dashed px-4 pt-2">
-              <p className="aui-tool-fallback-result-header font-semibold">
-                Result:
+          {result !== undefined && (
+            <div>
+              <p className="mb-0.5 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                Result
               </p>
-              <pre className="aui-tool-fallback-result-content whitespace-pre-wrap">
+              <pre className="text-xs whitespace-pre-wrap">
                 {typeof result === "string"
                   ? result
                   : JSON.stringify(result, null, 2)}

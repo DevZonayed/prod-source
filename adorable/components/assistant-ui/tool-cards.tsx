@@ -1,332 +1,317 @@
+"use client";
+
 import type { ToolCallMessagePartComponent } from "@assistant-ui/react";
-import { CheckIcon, XCircleIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  CheckIcon,
+  ChevronRightIcon,
+  CircleDashedIcon,
+  FileIcon,
+  FileEditIcon,
+  FilePlusIcon,
+  FolderIcon,
+  FolderPlusIcon,
+  MoveIcon,
+  SearchIcon,
+  TerminalIcon,
+  Trash2Icon,
+  XIcon,
+} from "lucide-react";
+import { useState } from "react";
 
-type GenericObject = Record<string, unknown>;
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                           */
+/* ------------------------------------------------------------------ */
 
-const asObject = (value: unknown): GenericObject => {
-  if (value && typeof value === "object") return value as GenericObject;
-  return {};
-};
+type Obj = Record<string, unknown>;
 
-const parseArgs = (argsText: string): GenericObject => {
+const obj = (v: unknown): Obj => (v && typeof v === "object" ? (v as Obj) : {});
+
+const parse = (argsText: string): Obj => {
   try {
-    const parsed = JSON.parse(argsText) as unknown;
-    return asObject(parsed);
+    return obj(JSON.parse(argsText));
   } catch {
-    return { raw: argsText };
+    return {};
   }
 };
 
-const previewText = (value: unknown, maxLines = 10): string | null => {
-  if (value == null) return null;
-  const text =
-    typeof value === "string" ? value : JSON.stringify(value, null, 2);
-  const lines = text.split("\n");
-  if (lines.length <= maxLines) return text;
-  return `${lines.slice(0, maxLines).join("\n")}\n…`;
+const str = (v: unknown): string | undefined =>
+  typeof v === "string" && v.length > 0 ? v : undefined;
+
+const preview = (v: unknown, max = 12): string | null => {
+  if (v == null) return null;
+  const t = typeof v === "string" ? v : JSON.stringify(v, null, 2);
+  const lines = t.split("\n");
+  if (lines.length <= max) return t;
+  return lines.slice(0, max).join("\n") + "\n…";
 };
 
-type ToolCardProps = {
-  title: string;
-  subtitle?: string;
-  toolName: string;
-  status?: { type: string; reason?: string; error?: unknown };
-  args?: GenericObject;
-  result?: unknown;
-  children?: React.ReactNode;
+/* ------------------------------------------------------------------ */
+/*  Shared single-line tool component                                 */
+/* ------------------------------------------------------------------ */
+
+type ToolLineProps = {
+  icon: React.ReactNode;
+  label: string;
+  detail?: string;
+  status?: { type: string; reason?: string };
+  expandContent?: React.ReactNode;
 };
 
-const ToolCard = ({
-  title,
-  subtitle,
-  toolName,
+const ToolLine = ({
+  icon,
+  label,
+  detail,
   status,
-  args,
-  result,
-  children,
-}: ToolCardProps) => {
-  const isCancelled =
-    status?.type === "incomplete" && status.reason === "cancelled";
+  expandContent,
+}: ToolLineProps) => {
+  const [open, setOpen] = useState(false);
+  const running = status?.type === "running";
+  const failed = status?.type === "incomplete" && status.reason === "cancelled";
 
   return (
-    <div
-      className={cn(
-        "mb-4 flex w-full flex-col gap-3 rounded-lg border px-4 py-3",
-        isCancelled && "border-muted-foreground/30 bg-muted/30",
-      )}
-    >
-      <div className="flex items-center gap-2">
-        {isCancelled ? (
-          <XCircleIcon className="size-4 text-muted-foreground" />
-        ) : (
-          <CheckIcon className="size-4" />
+    <div className="my-0.5">
+      <button
+        type="button"
+        onClick={() => expandContent && setOpen((v) => !v)}
+        className={cn(
+          "group flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm transition-colors hover:bg-muted/60",
+          failed && "text-muted-foreground line-through",
         )}
-        <p
-          className={cn("grow text-sm", isCancelled && "text-muted-foreground")}
-        >
-          {title}
-        </p>
-        <span className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-          {toolName}
-        </span>
-      </div>
+      >
+        {/* status dot / spinner */}
+        {running ? (
+          <CircleDashedIcon className="size-3 shrink-0 animate-spin text-muted-foreground" />
+        ) : failed ? (
+          <XIcon className="size-3 shrink-0 text-muted-foreground" />
+        ) : (
+          <CheckIcon className="size-3 shrink-0 text-muted-foreground" />
+        )}
 
-      {subtitle ? (
-        <p className="text-xs text-muted-foreground">{subtitle}</p>
-      ) : null}
+        {/* tool icon */}
+        <span className="shrink-0 text-muted-foreground">{icon}</span>
 
-      {children}
+        {/* label */}
+        <span className="shrink-0 font-medium">{label}</span>
 
-      {args && Object.keys(args).length > 0 ? (
-        <div className="rounded border border-dashed p-2">
-          <p className="mb-1 text-xs font-medium text-muted-foreground">
-            Input
-          </p>
-          <pre className="text-xs whitespace-pre-wrap">
-            {JSON.stringify(args, null, 2)}
-          </pre>
+        {/* detail (file path, command, etc.) */}
+        {detail && (
+          <span className="min-w-0 truncate text-muted-foreground">
+            {detail}
+          </span>
+        )}
+
+        {/* expand hint */}
+        {expandContent && (
+          <ChevronRightIcon
+            className={cn(
+              "ml-auto size-3 shrink-0 text-muted-foreground opacity-0 transition-all group-hover:opacity-100",
+              open && "rotate-90",
+            )}
+          />
+        )}
+      </button>
+
+      {open && expandContent && (
+        <div className="mt-1 mb-1 ml-9 max-h-64 overflow-auto rounded border bg-muted/30 px-3 py-2">
+          {expandContent}
         </div>
-      ) : null}
-
-      {result !== undefined ? (
-        <div className="rounded border border-dashed p-2">
-          <p className="mb-1 text-xs font-medium text-muted-foreground">
-            Result
-          </p>
-          <pre className="text-xs whitespace-pre-wrap">
-            {previewText(result) ?? "(empty)"}
-          </pre>
-        </div>
-      ) : null}
+      )}
     </div>
   );
 };
 
+/* ------------------------------------------------------------------ */
+/*  Detail block (shared for expanded view)                           */
+/* ------------------------------------------------------------------ */
+
+const DetailBlock = ({ data }: { data: unknown }) => {
+  if (data == null) return null;
+  const text = preview(data, 20);
+  if (!text) return null;
+  return (
+    <pre className="text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
+      {text}
+    </pre>
+  );
+};
+
+/* ------------------------------------------------------------------ */
+/*  Per-tool cards                                                    */
+/* ------------------------------------------------------------------ */
+
 export const BashToolCard: ToolCallMessagePartComponent = ({
-  toolName,
   argsText,
   result,
   status,
 }) => {
-  const args = parseArgs(argsText);
-  const command = typeof args.command === "string" ? args.command : undefined;
+  const a = parse(argsText);
+  const r = obj(result);
+  const cmd = str(a.command);
+  const hasOutput = str(r.stdout) || str(r.stderr);
 
   return (
-    <ToolCard
-      title="Executed shell command"
-      subtitle={command}
-      toolName={toolName}
+    <ToolLine
+      icon={<TerminalIcon className="size-3.5" />}
+      label="Ran"
+      detail={cmd}
       status={status}
-      args={args}
-      result={result}
+      expandContent={
+        hasOutput ? <DetailBlock data={r.stdout || r.stderr} /> : undefined
+      }
     />
   );
 };
 
 export const ReadFileToolCard: ToolCallMessagePartComponent = ({
-  toolName,
   argsText,
   result,
   status,
 }) => {
-  const args = parseArgs(argsText);
-  const resultObj = asObject(result);
-  const contentPreview = previewText(resultObj.content, 16);
+  const a = parse(argsText);
+  const r = obj(result);
 
   return (
-    <ToolCard
-      title="Read file"
-      subtitle={typeof args.file === "string" ? args.file : undefined}
-      toolName={toolName}
+    <ToolLine
+      icon={<FileIcon className="size-3.5" />}
+      label="Read"
+      detail={str(a.file)}
       status={status}
-      args={args}
-      result={undefined}
-    >
-      {contentPreview ? (
-        <div className="rounded border border-dashed p-2">
-          <p className="mb-1 text-xs font-medium text-muted-foreground">
-            Content preview
-          </p>
-          <pre className="text-xs whitespace-pre-wrap">{contentPreview}</pre>
-        </div>
-      ) : null}
-    </ToolCard>
+      expandContent={r.content ? <DetailBlock data={r.content} /> : undefined}
+    />
   );
 };
 
 export const WriteFileToolCard: ToolCallMessagePartComponent = ({
-  toolName,
   argsText,
-  result,
   status,
 }) => {
-  const args = parseArgs(argsText);
-  const resultObj = asObject(result);
+  const a = parse(argsText);
 
   return (
-    <ToolCard
-      title="Wrote file"
-      subtitle={typeof args.file === "string" ? args.file : undefined}
-      toolName={toolName}
+    <ToolLine
+      icon={<FileEditIcon className="size-3.5" />}
+      label="Wrote"
+      detail={str(a.file)}
       status={status}
-      args={{ file: args.file }}
-      result={{ ok: resultObj.ok }}
     />
   );
 };
 
 export const ListFilesToolCard: ToolCallMessagePartComponent = ({
-  toolName,
   argsText,
   result,
   status,
 }) => {
-  const args = parseArgs(argsText);
-  const resultObj = asObject(result);
+  const a = parse(argsText);
+  const r = obj(result);
 
   return (
-    <ToolCard
-      title="Listed files"
-      subtitle={typeof args.path === "string" ? args.path : undefined}
-      toolName={toolName}
+    <ToolLine
+      icon={<FolderIcon className="size-3.5" />}
+      label="Listed"
+      detail={str(a.path)}
       status={status}
-      args={args}
-      result={{
-        stdout: resultObj.stdout,
-        stderr: resultObj.stderr,
-        ok: resultObj.ok,
-      }}
+      expandContent={r.stdout ? <DetailBlock data={r.stdout} /> : undefined}
     />
   );
 };
 
 export const SearchFilesToolCard: ToolCallMessagePartComponent = ({
-  toolName,
   argsText,
   result,
   status,
 }) => {
-  const args = parseArgs(argsText);
-  const resultObj = asObject(result);
+  const a = parse(argsText);
+  const r = obj(result);
 
   return (
-    <ToolCard
-      title="Searched files"
-      subtitle={
-        typeof args.query === "string" ? `query: ${args.query}` : undefined
-      }
-      toolName={toolName}
+    <ToolLine
+      icon={<SearchIcon className="size-3.5" />}
+      label="Searched"
+      detail={str(a.query) ? `"${a.query}"` : undefined}
       status={status}
-      args={args}
-      result={{
-        stdout: resultObj.stdout,
-        stderr: resultObj.stderr,
-        ok: resultObj.ok,
-      }}
+      expandContent={r.stdout ? <DetailBlock data={r.stdout} /> : undefined}
     />
   );
 };
 
 export const ReplaceInFileToolCard: ToolCallMessagePartComponent = ({
-  toolName,
   argsText,
-  result,
   status,
 }) => {
-  const args = parseArgs(argsText);
+  const a = parse(argsText);
+
   return (
-    <ToolCard
-      title="Replaced text in file"
-      subtitle={typeof args.file === "string" ? args.file : undefined}
-      toolName={toolName}
+    <ToolLine
+      icon={<FileEditIcon className="size-3.5" />}
+      label="Edited"
+      detail={str(a.file)}
       status={status}
-      args={{ file: args.file, search: args.search, all: args.all }}
-      result={result}
     />
   );
 };
 
 export const AppendToFileToolCard: ToolCallMessagePartComponent = ({
-  toolName,
   argsText,
-  result,
   status,
 }) => {
-  const args = parseArgs(argsText);
+  const a = parse(argsText);
 
   return (
-    <ToolCard
-      title="Appended to file"
-      subtitle={typeof args.file === "string" ? args.file : undefined}
-      toolName={toolName}
+    <ToolLine
+      icon={<FilePlusIcon className="size-3.5" />}
+      label="Appended"
+      detail={str(a.file)}
       status={status}
-      args={{ file: args.file }}
-      result={result}
     />
   );
 };
 
 export const MakeDirectoryToolCard: ToolCallMessagePartComponent = ({
-  toolName,
   argsText,
-  result,
   status,
 }) => {
-  const args = parseArgs(argsText);
+  const a = parse(argsText);
 
   return (
-    <ToolCard
-      title="Created directory"
-      subtitle={typeof args.path === "string" ? args.path : undefined}
-      toolName={toolName}
+    <ToolLine
+      icon={<FolderPlusIcon className="size-3.5" />}
+      label="Created dir"
+      detail={str(a.path)}
       status={status}
-      args={args}
-      result={result}
     />
   );
 };
 
 export const MovePathToolCard: ToolCallMessagePartComponent = ({
-  toolName,
   argsText,
-  result,
   status,
 }) => {
-  const args = parseArgs(argsText);
+  const a = parse(argsText);
 
   return (
-    <ToolCard
-      title="Moved path"
-      subtitle={
-        typeof args.from === "string" && typeof args.to === "string"
-          ? `${args.from} → ${args.to}`
-          : undefined
-      }
-      toolName={toolName}
+    <ToolLine
+      icon={<MoveIcon className="size-3.5" />}
+      label="Moved"
+      detail={str(a.from) && str(a.to) ? `${a.from} → ${a.to}` : str(a.from)}
       status={status}
-      args={args}
-      result={result}
     />
   );
 };
 
 export const DeletePathToolCard: ToolCallMessagePartComponent = ({
-  toolName,
   argsText,
-  result,
   status,
 }) => {
-  const args = parseArgs(argsText);
+  const a = parse(argsText);
 
   return (
-    <ToolCard
-      title="Deleted path"
-      subtitle={typeof args.path === "string" ? args.path : undefined}
-      toolName={toolName}
+    <ToolLine
+      icon={<Trash2Icon className="size-3.5" />}
+      label="Deleted"
+      detail={str(a.path)}
       status={status}
-      args={args}
-      result={result}
     />
   );
 };
