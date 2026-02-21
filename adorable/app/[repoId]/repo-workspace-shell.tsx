@@ -82,16 +82,8 @@ export function RepoWorkspaceShell({
   }, [loadRepos]);
 
   const handleCreateRepo = useCallback(async () => {
-    const response = await fetch("/api/repos", { method: "POST" });
-    if (!response.ok) return;
-
-    const data = await response.json();
-    await loadRepos();
-
-    if (data.id && data.conversationId) {
-      router.push(`/${data.id}/${data.conversationId}`);
-    }
-  }, [loadRepos, router]);
+    router.push("/");
+  }, [router]);
 
   const handleCreateConversation = useCallback(
     async (nextRepoId: string) => {

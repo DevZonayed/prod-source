@@ -7,6 +7,7 @@ import {
 } from "@assistant-ui/react-ai-sdk";
 import { useChat } from "@ai-sdk/react";
 import { type UIMessage } from "ai";
+import { useRouter } from "next/navigation";
 import { Thread } from "@/components/assistant-ui/thread";
 import { useCallback, useEffect, useState } from "react";
 
@@ -15,8 +16,10 @@ type ThreadState = {
   isRunning: boolean;
 };
 
+const EMPTY_MESSAGES: UIMessage[] = [];
+
 export const Assistant = ({
-  initialMessages = [],
+  initialMessages,
   selectedRepoId = null,
   selectedConversationId = null,
   onThreadStateChange,
@@ -26,16 +29,21 @@ export const Assistant = ({
   selectedConversationId?: string | null;
   onThreadStateChange?: (next: ThreadState) => void;
 }) => {
-  const [seedMessages, setSeedMessages] =
-    useState<UIMessage[]>(initialMessages);
+  const router = useRouter();
+  const resolvedInitialMessages = initialMessages ?? EMPTY_MESSAGES;
+
+  const [seedMessages, setSeedMessages] = useState<UIMessage[]>(
+    resolvedInitialMessages,
+  );
   const [localRepoId, setLocalRepoId] = useState<string | null>(selectedRepoId);
   const [localConversationId, setLocalConversationId] = useState<string | null>(
     selectedConversationId,
   );
+  const [pendingRoute, setPendingRoute] = useState<string | null>(null);
 
   useEffect(() => {
-    setSeedMessages(initialMessages);
-  }, [initialMessages]);
+    setSeedMessages(resolvedInitialMessages);
+  }, [resolvedInitialMessages]);
 
   useEffect(() => {
     setLocalRepoId(selectedRepoId);
@@ -93,6 +101,7 @@ export const Assistant = ({
 
     const nextPath = `/${repoId}/${conversationId}`;
     window.history.replaceState(window.history.state, "", nextPath);
+    setPendingRoute(nextPath);
     setLocalRepoId(repoId);
     setLocalConversationId(conversationId);
 
@@ -102,7 +111,13 @@ export const Assistant = ({
     };
   }, [localConversationId, localRepoId]);
 
-  const runtimeKey = localRepoId ?? "none";
+  const runtimeKey = "assistant-runtime";
+
+  const handleFinish = useCallback(() => {
+    if (!pendingRoute) return;
+    router.replace(pendingRoute);
+    setPendingRoute(null);
+  }, [pendingRoute, router]);
 
   const chat = useChat<UIMessage>({
     id: runtimeKey,
@@ -126,6 +141,7 @@ export const Assistant = ({
       },
     }),
     messages: seedMessages,
+    onFinish: handleFinish,
   });
 
   const runtime = useAISDKRuntime(chat);
