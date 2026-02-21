@@ -74,6 +74,8 @@ export function RepoWorkspaceShell({
               vm?: RepoVmInfo;
               conversations?: RepoItem["conversations"];
               deployments?: RepoDeployment[];
+              productionDomain?: string | null;
+              productionDeploymentId?: string | null;
             };
           }) => ({
             id: repo.id,
@@ -85,6 +87,14 @@ export function RepoWorkspaceShell({
             deployments: Array.isArray(repo.metadata?.deployments)
               ? repo.metadata.deployments
               : [],
+            productionDomain:
+              typeof repo.metadata?.productionDomain === "string"
+                ? repo.metadata.productionDomain
+                : null,
+            productionDeploymentId:
+              typeof repo.metadata?.productionDeploymentId === "string"
+                ? repo.metadata.productionDeploymentId
+                : null,
           }),
         )
       : [];
@@ -224,6 +234,49 @@ export function RepoWorkspaceShell({
     [router],
   );
 
+  const onSetProductionDomain = useCallback(
+    async (nextRepoId: string, domain: string) => {
+      const response = await fetch(
+        `/api/repos/${nextRepoId}/production-domain`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ domain }),
+        },
+      );
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(data?.error ?? "Failed to configure production domain");
+      }
+
+      await loadRepos();
+    },
+    [loadRepos],
+  );
+
+  const onPromoteDeployment = useCallback(
+    async (nextRepoId: string, deploymentId: string) => {
+      const response = await fetch(`/api/repos/${nextRepoId}/promote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deploymentId }),
+      });
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(data?.error ?? "Failed to promote deployment");
+      }
+
+      await loadRepos();
+    },
+    [loadRepos],
+  );
+
   return (
     <SidebarProvider
       defaultOpen={true}
@@ -237,6 +290,8 @@ export function RepoWorkspaceShell({
           onSelectConversation={onSelectConversation}
           onCreateRepo={handleCreateRepo}
           onCreateConversation={handleCreateConversation}
+          onSetProductionDomain={onSetProductionDomain}
+          onPromoteDeployment={onPromoteDeployment}
           collapsible="icon"
         />
         <SidebarInset>

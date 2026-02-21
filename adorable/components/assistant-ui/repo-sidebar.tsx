@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Sidebar, useSidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   CheckIcon,
   CircleDashedIcon,
@@ -40,6 +41,8 @@ export type RepoItem = {
   vm: RepoVmInfo | null;
   conversations: RepoConversation[];
   deployments: RepoDeployment[];
+  productionDomain: string | null;
+  productionDeploymentId: string | null;
 };
 
 const toDisplayConversationTitle = (title: string) => {
@@ -81,6 +84,8 @@ export function RepoSidebar({
   onSelectConversation,
   onCreateRepo,
   onCreateConversation,
+  onSetProductionDomain,
+  onPromoteDeployment,
   collapsible = "icon",
 }: {
   repos: RepoItem[];
@@ -89,6 +94,8 @@ export function RepoSidebar({
   onSelectConversation: (repoId: string, conversationId: string) => void;
   onCreateRepo: () => Promise<void>;
   onCreateConversation: (repoId: string) => Promise<void>;
+  onSetProductionDomain: (repoId: string, domain: string) => Promise<void>;
+  onPromoteDeployment: (repoId: string, deploymentId: string) => Promise<void>;
   collapsible?: "icon" | "offcanvas";
 }) {
   const [tab, setTab] = React.useState<"threads" | "deployments">("threads");
@@ -255,10 +262,11 @@ export function RepoSidebar({
                 </div>
               ) : (
                 <DeploymentTimelineList
-                  items={
-                    repos.find((repo) => repo.id === selectedRepoId)
-                      ?.deployments ?? []
+                  repo={
+                    repos.find((repo) => repo.id === selectedRepoId) ?? null
                   }
+                  onSetProductionDomain={onSetProductionDomain}
+                  onPromoteDeployment={onPromoteDeployment}
                 />
               )}
             </div>
@@ -269,17 +277,143 @@ export function RepoSidebar({
   );
 }
 
-function DeploymentTimelineList({ items }: { items: RepoDeployment[] }) {
-  if (!items.length) {
+function DeploymentTimelineList({
+  repo,
+  onSetProductionDomain,
+  onPromoteDeployment,
+}: {
+  repo: RepoItem | null;
+  onSetProductionDomain: (repoId: string, domain: string) => Promise<void>;
+  onPromoteDeployment: (repoId: string, deploymentId: string) => Promise<void>;
+}) {
+  const [domainInput, setDomainInput] = React.useState("");
+  const [isSavingDomain, setIsSavingDomain] = React.useState(false);
+  const [isPromotingId, setIsPromotingId] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setDomainInput(repo?.productionDomain ?? "");
+    setError(null);
+  }, [repo?.id, repo?.productionDomain]);
+
+  if (!repo) {
     return (
       <div className="px-2 py-3 text-xs text-muted-foreground">
-        No deployments yet.
+        Select a project to view deployments.
+      </div>
+    );
+  }
+
+  const items = repo.deployments;
+
+  const handleSaveDomain = async () => {
+    const nextDomain = domainInput.trim().toLowerCase();
+    if (!nextDomain.endsWith(".style.dev")) {
+      setError("Domain must end in .style.dev");
+      return;
+    }
+
+    setError(null);
+    setIsSavingDomain(true);
+    try {
+      await onSetProductionDomain(repo.id, nextDomain);
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Failed to save production domain",
+      );
+    } finally {
+      setIsSavingDomain(false);
+    }
+  };
+
+  const handlePromote = async (deploymentId: string) => {
+    setError(null);
+    setIsPromotingId(deploymentId);
+    try {
+      await onPromoteDeployment(repo.id, deploymentId);
+    } catch (promoteError) {
+      setError(
+        promoteError instanceof Error
+          ? promoteError.message
+          : "Failed to promote deployment",
+      );
+    } finally {
+      setIsPromotingId(null);
+    }
+  };
+
+  if (!items.length) {
+    return (
+      <div className="space-y-2 px-1 pb-2">
+        <div className="space-y-1.5 rounded-md border p-2">
+          <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
+            Production domain
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Input
+              value={domainInput}
+              onChange={(event) => setDomainInput(event.target.value)}
+              placeholder="my-app.style.dev"
+              className="h-8 text-xs"
+            />
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 px-2 text-xs"
+              onClick={handleSaveDomain}
+              disabled={isSavingDomain}
+            >
+              Save
+            </Button>
+          </div>
+          {error ? (
+            <div className="text-[10px] text-muted-foreground">{error}</div>
+          ) : (
+            <div className="text-[10px] text-muted-foreground">
+              Domain must end in .style.dev
+            </div>
+          )}
+        </div>
+        <div className="px-1 py-2 text-xs text-muted-foreground">
+          No deployments yet.
+        </div>
       </div>
     );
   }
 
   return (
     <div className="h-full space-y-3 overflow-x-hidden overflow-y-auto px-1 pb-2">
+      <div className="space-y-1.5 rounded-md border p-2">
+        <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
+          Production domain
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Input
+            value={domainInput}
+            onChange={(event) => setDomainInput(event.target.value)}
+            placeholder="my-app.style.dev"
+            className="h-8 text-xs"
+          />
+          <Button
+            type="button"
+            size="sm"
+            className="h-8 px-2 text-xs"
+            onClick={handleSaveDomain}
+            disabled={isSavingDomain}
+          >
+            Save
+          </Button>
+        </div>
+        <div className="text-[10px] text-muted-foreground">
+          {error
+            ? error
+            : repo.productionDomain
+              ? `Current: ${repo.productionDomain}`
+              : "Domain must end in .style.dev"}
+        </div>
+      </div>
       {items.map((entry) => (
         <div
           key={`${entry.commitSha}-${entry.url}`}
@@ -311,6 +445,30 @@ function DeploymentTimelineList({ items }: { items: RepoDeployment[] }) {
             title={entry.commitMessage}
           >
             {entry.commitMessage}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Button
+              type="button"
+              size="sm"
+              className="h-7 px-2 text-[11px]"
+              onClick={() => {
+                if (!entry.deploymentId) return;
+                void handlePromote(entry.deploymentId);
+              }}
+              disabled={
+                !entry.deploymentId ||
+                !repo.productionDomain ||
+                isPromotingId === entry.deploymentId
+              }
+            >
+              Promote
+            </Button>
+            {repo.productionDeploymentId === entry.deploymentId &&
+            entry.deploymentId ? (
+              <span className="text-[10px] tracking-wide text-muted-foreground uppercase">
+                Production
+              </span>
+            ) : null}
           </div>
           {entry.state === "deploying" ? (
             <div className="flex h-20 items-center justify-center rounded border bg-background">

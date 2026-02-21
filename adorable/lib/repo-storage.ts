@@ -34,6 +34,8 @@ export type RepoMetadata = {
   vm: RepoVmMetadata;
   conversations: RepoConversationSummary[];
   deployments: RepoDeploymentSummary[];
+  productionDomain: string | null;
+  productionDeploymentId: string | null;
 };
 
 const decodeBase64 = (value: string) => {
@@ -119,6 +121,14 @@ export const readRepoMetadata = async (
     deployments: Array.isArray(metadata.deployments)
       ? metadata.deployments
       : [],
+    productionDomain:
+      typeof metadata.productionDomain === "string"
+        ? metadata.productionDomain
+        : null,
+    productionDeploymentId:
+      typeof metadata.productionDeploymentId === "string"
+        ? metadata.productionDeploymentId
+        : null,
   };
 };
 
@@ -249,6 +259,48 @@ export const addRepoDeployment = async (
   };
 
   await writeCommit(repoId, "Record deployment", [
+    {
+      path: ADORABLE_METADATA_PATH,
+      content: encodeJson(nextMetadata),
+    },
+  ]);
+
+  return nextMetadata;
+};
+
+export const setRepoProductionDomain = async (
+  repoId: string,
+  metadata: RepoMetadata,
+  productionDomain: string,
+) => {
+  const latestMetadata = (await readRepoMetadata(repoId)) ?? metadata;
+  const nextMetadata: RepoMetadata = {
+    ...latestMetadata,
+    productionDomain,
+  };
+
+  await writeCommit(repoId, "Configure production domain", [
+    {
+      path: ADORABLE_METADATA_PATH,
+      content: encodeJson(nextMetadata),
+    },
+  ]);
+
+  return nextMetadata;
+};
+
+export const promoteRepoDeploymentToProduction = async (
+  repoId: string,
+  metadata: RepoMetadata,
+  productionDeploymentId: string,
+) => {
+  const latestMetadata = (await readRepoMetadata(repoId)) ?? metadata;
+  const nextMetadata: RepoMetadata = {
+    ...latestMetadata,
+    productionDeploymentId,
+  };
+
+  await writeCommit(repoId, "Promote deployment to production", [
     {
       path: ADORABLE_METADATA_PATH,
       content: encodeJson(nextMetadata),

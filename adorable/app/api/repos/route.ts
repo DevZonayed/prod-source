@@ -156,6 +156,8 @@ export async function POST(req: Request) {
     vm,
     conversations: [],
     deployments: [],
+    productionDomain: null,
+    productionDeploymentId: null,
   };
 
   await writeRepoMetadata(repoId, initialMetadata);
