@@ -16,12 +16,24 @@ export default async function ConversationPage({
   const { repoId, conversationId } = await params;
 
   if (!(await hasRepoAccess(repoId))) {
-    return <Assistant initialMessages={[]} />;
+    return (
+      <Assistant
+        initialMessages={[]}
+        selectedRepoId={repoId}
+        selectedConversationId={conversationId}
+      />
+    );
   }
 
   const initialMessages = await readConversationMessages(
     repoId,
     conversationId,
   );
-  return <Assistant initialMessages={initialMessages} />;
+  return (
+    <Assistant
+      initialMessages={initialMessages}
+      selectedRepoId={repoId}
+      selectedConversationId={conversationId}
+    />
+  );
 }
