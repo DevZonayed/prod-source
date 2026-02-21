@@ -135,11 +135,12 @@ export const createConversationInRepo = async (
   metadata: RepoMetadata,
   conversationId: string,
 ) => {
+  const latestMetadata = (await readRepoMetadata(repoId)) ?? metadata;
   const now = new Date().toISOString();
-  const fallbackTitle = `Conversation ${metadata.conversations.length + 1}`;
+  const fallbackTitle = `Conversation ${latestMetadata.conversations.length + 1}`;
 
   const nextMetadata: RepoMetadata = {
-    ...metadata,
+    ...latestMetadata,
     conversations: [
       {
         id: conversationId,
@@ -147,7 +148,7 @@ export const createConversationInRepo = async (
         createdAt: now,
         updatedAt: now,
       },
-      ...metadata.conversations,
+      ...latestMetadata.conversations,
     ],
   };
 
@@ -183,11 +184,15 @@ export const saveConversationMessages = async (
   conversationId: string,
   messages: UIMessage[],
 ) => {
+  const latestMetadata = (await readRepoMetadata(repoId)) ?? metadata;
   const now = new Date().toISOString();
 
-  const existing = metadata.conversations.find((c) => c.id === conversationId);
+  const existing = latestMetadata.conversations.find(
+    (c) => c.id === conversationId,
+  );
   const fallbackTitle =
-    existing?.title ?? `Conversation ${metadata.conversations.length + 1}`;
+    existing?.title ??
+    `Conversation ${latestMetadata.conversations.length + 1}`;
   const title = deriveConversationTitle(messages, fallbackTitle);
 
   const updatedConversation: RepoConversationSummary = {
@@ -199,11 +204,11 @@ export const saveConversationMessages = async (
 
   const nextConversations = [
     updatedConversation,
-    ...metadata.conversations.filter((c) => c.id !== conversationId),
+    ...latestMetadata.conversations.filter((c) => c.id !== conversationId),
   ];
 
   const nextMetadata: RepoMetadata = {
-    ...metadata,
+    ...latestMetadata,
     conversations: nextConversations,
   };
 
@@ -226,11 +231,12 @@ export const addRepoDeployment = async (
   metadata: RepoMetadata,
   deployment: RepoDeploymentSummary,
 ) => {
+  const latestMetadata = (await readRepoMetadata(repoId)) ?? metadata;
   const nextMetadata: RepoMetadata = {
-    ...metadata,
+    ...latestMetadata,
     deployments: [
       deployment,
-      ...metadata.deployments.filter(
+      ...latestMetadata.deployments.filter(
         (d) => d.commitSha !== deployment.commitSha,
       ),
     ],
