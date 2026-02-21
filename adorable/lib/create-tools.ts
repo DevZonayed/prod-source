@@ -321,7 +321,9 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
         "adorable@freestyle.sh",
       )} && git -C ${shellQuote(WORKDIR)} commit -am ${shellQuote(
         message,
-      )} && git -C ${shellQuote(WORKDIR)} push`;
+      )} && git -C ${shellQuote(WORKDIR)} pull --rebase && git -C ${shellQuote(
+        WORKDIR,
+      )} push`;
       const commitResult = await runExecCommand(gitCommand);
 
       if (commitResult.ok && options?.repoId) {
