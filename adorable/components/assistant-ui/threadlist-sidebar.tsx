@@ -77,7 +77,7 @@ export function ThreadListSidebar({
           >
             <span className="flex items-center gap-2">
               <AdorableLogo />
-              <span className="text-[13px] font-medium">New Thread</span>
+              <span className="text-[13px] font-medium">Adorable</span>
             </span>
             <PlusIcon className="size-3.5" />
           </Button>
