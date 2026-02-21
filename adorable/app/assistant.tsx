@@ -23,11 +23,13 @@ export const Assistant = ({
   selectedRepoId = null,
   selectedConversationId = null,
   onThreadStateChange,
+  onActiveConversationChange,
 }: {
   initialMessages?: UIMessage[];
   selectedRepoId?: string | null;
   selectedConversationId?: string | null;
   onThreadStateChange?: (next: ThreadState) => void;
+  onActiveConversationChange?: (repoId: string, conversationId: string) => void;
 }) => {
   const router = useRouter();
   const resolvedInitialMessages = initialMessages ?? EMPTY_MESSAGES;
@@ -52,6 +54,7 @@ export const Assistant = ({
 
   const ensureActiveConversation = useCallback(async () => {
     if (localRepoId && localConversationId) {
+      onActiveConversationChange?.(localRepoId, localConversationId);
       return {
         repoId: localRepoId,
         conversationId: localConversationId,
@@ -79,6 +82,7 @@ export const Assistant = ({
       const nextPath = `/${localRepoId}/${conversationId}`;
       window.history.replaceState(window.history.state, "", nextPath);
       setLocalConversationId(conversationId);
+      onActiveConversationChange?.(localRepoId, conversationId);
 
       return {
         repoId: localRepoId,
@@ -104,12 +108,13 @@ export const Assistant = ({
     setPendingRoute(nextPath);
     setLocalRepoId(repoId);
     setLocalConversationId(conversationId);
+    onActiveConversationChange?.(repoId, conversationId);
 
     return {
       repoId,
       conversationId,
     };
-  }, [localConversationId, localRepoId]);
+  }, [localConversationId, localRepoId, onActiveConversationChange]);
 
   const runtimeKey = "assistant-runtime";
 

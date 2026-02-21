@@ -39,13 +39,20 @@ type TerminalTab = {
 export function RepoWorkspaceShell({
   repoId,
   children,
+  selectedConversationIdOverride,
+  sidebarVisible = true,
 }: {
-  repoId: string;
+  repoId: string | null;
   children: React.ReactNode;
+  selectedConversationIdOverride?: string | null;
+  sidebarVisible?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const selectedConversationId = pathname.split("/").filter(Boolean)[1] ?? null;
+  const selectedConversationId =
+    selectedConversationIdOverride ??
+    pathname.split("/").filter(Boolean)[1] ??
+    null;
 
   const [repos, setRepos] = useState<RepoItem[]>([]);
 
@@ -81,6 +88,11 @@ export function RepoWorkspaceShell({
     loadRepos();
   }, [loadRepos]);
 
+  useEffect(() => {
+    if (!repoId) return;
+    loadRepos();
+  }, [loadRepos, repoId]);
+
   const handleCreateRepo = useCallback(async () => {
     router.push("/");
   }, [router]);
@@ -92,7 +104,9 @@ export function RepoWorkspaceShell({
     [router],
   );
 
-  const selectedRepo = repos.find((repo) => repo.id === repoId) ?? null;
+  const selectedRepo = repoId
+    ? (repos.find((repo) => repo.id === repoId) ?? null)
+    : null;
   const hasPreview = Boolean(selectedRepo?.vm?.previewUrl);
   const showPreview = hasPreview && Boolean(repoId);
 
@@ -106,14 +120,16 @@ export function RepoWorkspaceShell({
   return (
     <SidebarProvider>
       <div className="flex h-dvh w-full pr-0.5">
-        <RepoSidebar
-          repos={repos}
-          selectedRepoId={repoId}
-          selectedConversationId={selectedConversationId}
-          onSelectConversation={onSelectConversation}
-          onCreateRepo={handleCreateRepo}
-          onCreateConversation={handleCreateConversation}
-        />
+        {sidebarVisible ? (
+          <RepoSidebar
+            repos={repos}
+            selectedRepoId={repoId}
+            selectedConversationId={selectedConversationId}
+            onSelectConversation={onSelectConversation}
+            onCreateRepo={handleCreateRepo}
+            onCreateConversation={handleCreateConversation}
+          />
+        ) : null}
         <SidebarInset>
           <div
             className="grid h-dvh transition-[grid-template-columns] duration-500 ease-in-out"
@@ -134,7 +150,7 @@ export function RepoWorkspaceShell({
               {showPreview &&
                 (selectedRepo?.vm?.previewUrl ? (
                   <AppPreview
-                    repoId={repoId}
+                    repoId={repoId ?? undefined}
                     metadata={selectedRepo.vm}
                     isAgentRunning={false}
                   />
