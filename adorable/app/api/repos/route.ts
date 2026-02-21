@@ -6,6 +6,7 @@ import { createVmForRepo } from "@/lib/adorable-vm";
 import { getOrCreateIdentitySession } from "@/lib/identity-session";
 import {
   type RepoMetadata,
+  type RepoDeploymentSummary,
   createConversationInRepo,
   readRepoMetadata,
   writeRepoMetadata,
@@ -20,14 +21,66 @@ const toDisplayRepoName = (name?: string | null) => {
     : name;
 };
 
-const toRepoResponse = async (repo: { id: string; name?: string | null }) => {
+type DeploymentEntry = {
+  deploymentId: string;
+  state: "building" | "deployed" | "failed";
+  domains: string[];
+};
+
+const reconcileDeploymentState = (
+  deployment: RepoDeploymentSummary,
+  entries: DeploymentEntry[],
+): RepoDeploymentSummary => {
+  const matchById = deployment.deploymentId
+    ? entries.find((entry) => entry.deploymentId === deployment.deploymentId)
+    : undefined;
+
+  const matchByDomain = entries.find((entry) =>
+    entry.domains.includes(deployment.domain),
+  );
+
+  const match = matchById ?? matchByDomain;
+  if (!match) {
+    return {
+      ...deployment,
+      state: deployment.state === "deploying" ? "idle" : deployment.state,
+    };
+  }
+
+  const state: RepoDeploymentSummary["state"] =
+    match.state === "deployed"
+      ? "live"
+      : match.state === "failed"
+        ? "failed"
+        : "deploying";
+
+  return {
+    ...deployment,
+    deploymentId: match.deploymentId ?? deployment.deploymentId,
+    state,
+  };
+};
+
+const toRepoResponse = async (
+  repo: { id: string; name?: string | null },
+  deploymentEntries: DeploymentEntry[],
+) => {
   const metadata = await readRepoMetadata(repo.id);
   const repoDisplayName = toDisplayRepoName(repo.name);
   const metadataDisplayName = toDisplayRepoName(metadata?.name);
+  const reconciledMetadata = metadata
+    ? {
+        ...metadata,
+        deployments: metadata.deployments.map((deployment) =>
+          reconcileDeploymentState(deployment, deploymentEntries),
+        ),
+      }
+    : metadata;
+
   return {
     id: repo.id,
     name: repoDisplayName ?? metadataDisplayName ?? "Untitled Repo",
-    metadata,
+    metadata: reconciledMetadata,
   };
 };
 
@@ -35,8 +88,18 @@ export async function GET() {
   const { identityId, identity } = await getOrCreateIdentitySession();
   const { repositories } = await identity.permissions.git.list({ limit: 200 });
 
+  let deploymentEntries: DeploymentEntry[] = [];
+  try {
+    const { entries } = await freestyle.serverless.deployments.list({
+      limit: 500,
+    });
+    deploymentEntries = entries as DeploymentEntry[];
+  } catch {
+    deploymentEntries = [];
+  }
+
   const items = await Promise.all(
-    repositories.map((repo) => toRepoResponse(repo)),
+    repositories.map((repo) => toRepoResponse(repo, deploymentEntries)),
   );
 
   return NextResponse.json({

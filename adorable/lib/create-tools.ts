@@ -1,7 +1,7 @@
 import { tool } from "ai";
 import { freestyle, Vm } from "freestyle-sandboxes";
 import { z } from "zod";
-import { getDomainForCommit, getLatestCommitSha } from "./deployment-status";
+import { getDomainForCommit } from "./deployment-status";
 import { addRepoDeployment, readRepoMetadata } from "./repo-storage";
 import { WORKDIR, VM_PORT } from "./vars";
 
@@ -76,6 +76,17 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
         error: error instanceof Error ? error.message : "Failed to read logs.",
       };
     }
+  };
+
+  const getHeadCommitSha = async () => {
+    const result = await runExecCommand(
+      `git -C ${shellQuote(WORKDIR)} rev-parse HEAD`,
+    );
+    if (!result.ok) return null;
+
+    const sha = result.stdout.trim().split("\n")[0]?.trim();
+    if (!sha || !/^[0-9a-f]{7,40}$/i.test(sha)) return null;
+    return sha;
   };
 
   const bashTool = tool({
@@ -329,25 +340,38 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
 
       if (commitResult.ok && options?.repoId) {
         void (async () => {
-          const commitSha = await getLatestCommitSha(options.repoId!);
+          const commitSha = await getHeadCommitSha();
           if (!commitSha) return;
 
           const deploymentDomain = getDomainForCommit(commitSha);
+          const metadata = await readRepoMetadata(options.repoId!);
+          if (!metadata) return;
+
+          await addRepoDeployment(options.repoId!, metadata, {
+            commitSha,
+            commitMessage: message,
+            commitDate: new Date().toISOString(),
+            domain: deploymentDomain,
+            url: `https://${deploymentDomain}`,
+            deploymentId: null,
+            state: "deploying",
+          });
+
           const deployment = await freestyle.serverless.deployments.create({
             repo: options.repoId!,
             domains: [deploymentDomain],
             build: true,
           });
 
-          const metadata = await readRepoMetadata(options.repoId!);
-          if (!metadata) return;
-
           const deploymentId =
             deployment && typeof deployment === "object" && "id" in deployment
               ? String((deployment as Record<string, unknown>).id ?? "") || null
               : null;
 
-          await addRepoDeployment(options.repoId!, metadata, {
+          const latestMetadata = await readRepoMetadata(options.repoId!);
+          if (!latestMetadata) return;
+
+          await addRepoDeployment(options.repoId!, latestMetadata, {
             commitSha,
             commitMessage: message,
             commitDate: new Date().toISOString(),

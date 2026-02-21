@@ -13,18 +13,11 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
-  ExternalLinkIcon,
   Loader2Icon,
   PlusIcon,
   RotateCwIcon,
   XIcon,
 } from "lucide-react";
-
-type DeploymentStatus = {
-  state: "idle" | "deploying" | "live" | "failed";
-  url: string | null;
-  commitSha: string | null;
-};
 
 type TerminalTab = {
   id: string;
@@ -38,6 +31,11 @@ type OptimisticMetadataDetail = {
   conversationId: string;
   repoName: string;
   conversationTitle: string;
+};
+
+type ThreadStateDetail = {
+  repoId: string | null;
+  isRunning: boolean;
 };
 
 export function RepoWorkspaceShell({
@@ -57,6 +55,10 @@ export function RepoWorkspaceShell({
     null;
 
   const [repos, setRepos] = useState<RepoItem[]>([]);
+  const [threadIsRunning, setThreadIsRunning] = useState(false);
+  const hasDeployingRepo = repos.some((repo) =>
+    repo.deployments.some((deployment) => deployment.state === "deploying"),
+  );
 
   const loadRepos = useCallback(async () => {
     const response = await fetch("/api/repos", { cache: "no-store" });
@@ -100,6 +102,16 @@ export function RepoWorkspaceShell({
   }, [loadRepos, repoId]);
 
   useEffect(() => {
+    if (!threadIsRunning && !hasDeployingRepo) return;
+    const interval = window.setInterval(() => {
+      void loadRepos();
+    }, 10000);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [loadRepos, threadIsRunning, hasDeployingRepo]);
+
+  useEffect(() => {
     const handleReposUpdated = () => {
       void loadRepos();
     };
@@ -109,6 +121,27 @@ export function RepoWorkspaceShell({
       window.removeEventListener("adorable:repos-updated", handleReposUpdated);
     };
   }, [loadRepos]);
+
+  useEffect(() => {
+    const handleThreadState = (event: Event) => {
+      const customEvent = event as CustomEvent<ThreadStateDetail>;
+      const detail = customEvent.detail;
+      if (!detail) return;
+      if (repoId && detail.repoId && detail.repoId !== repoId) return;
+      setThreadIsRunning(Boolean(detail.isRunning));
+    };
+
+    window.addEventListener(
+      "adorable:thread-state",
+      handleThreadState as EventListener,
+    );
+    return () => {
+      window.removeEventListener(
+        "adorable:thread-state",
+        handleThreadState as EventListener,
+      );
+    };
+  }, [repoId]);
 
   useEffect(() => {
     const handleOptimisticMetadata = (event: Event) => {
@@ -224,11 +257,7 @@ export function RepoWorkspaceShell({
             >
               {showWorkspacePanel &&
                 (selectedRepo?.vm?.previewUrl ? (
-                  <AppPreview
-                    repoId={repoId ?? undefined}
-                    metadata={selectedRepo.vm}
-                    isAgentRunning={false}
-                  />
+                  <AppPreview metadata={selectedRepo.vm} />
                 ) : (
                   <PreviewPlaceholder />
                 ))}
@@ -237,91 +266,6 @@ export function RepoWorkspaceShell({
         </SidebarInset>
       </div>
     </SidebarProvider>
-  );
-}
-
-function DeploymentStatusBadge({
-  repoId,
-  isAgentRunning,
-}: {
-  repoId?: string;
-  isAgentRunning: boolean;
-}) {
-  const [status, setStatus] = useState<DeploymentStatus | null>(null);
-
-  useEffect(() => {
-    if (!repoId) {
-      setStatus(null);
-      return;
-    }
-
-    let cancelled = false;
-
-    const poll = async () => {
-      try {
-        const params = new URLSearchParams({
-          repoId,
-          running: isAgentRunning ? "1" : "0",
-        });
-        const response = await fetch(
-          `/api/deployment-status?${params.toString()}`,
-        );
-        if (!response.ok) return;
-        const data = await response.json();
-        if (cancelled) return;
-        setStatus({
-          state: data.state,
-          url: data.url ?? null,
-          commitSha: data.commitSha ?? null,
-        });
-      } catch {}
-    };
-
-    poll();
-    const interval = window.setInterval(poll, 5000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [repoId, isAgentRunning]);
-
-  if (!status) return null;
-  const show =
-    status.state === "deploying" ||
-    status.state === "live" ||
-    status.state === "failed";
-  if (!show) return null;
-
-  const label =
-    status.state === "deploying"
-      ? "Deploying…"
-      : status.state === "live"
-        ? "Deployment live"
-        : "Deployment failed";
-
-  return (
-    <div className="ml-2 inline-flex items-center gap-2 rounded-md border bg-background px-2 py-1 text-[11px] shadow-sm">
-      {status.state === "deploying" && (
-        <Loader2Icon className="size-3.5 animate-spin text-muted-foreground" />
-      )}
-      <span className="font-medium">{label}</span>
-      {status.commitSha && (
-        <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-          {status.commitSha.slice(0, 7)}
-        </span>
-      )}
-      {status.state === "live" && status.url && (
-        <a
-          href={status.url}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
-        >
-          Open
-          <ExternalLinkIcon className="size-3" />
-        </a>
-      )}
-    </div>
   );
 }
 
@@ -382,15 +326,7 @@ function PreviewPlaceholder() {
   );
 }
 
-function AppPreview({
-  metadata,
-  repoId,
-  isAgentRunning,
-}: {
-  metadata: RepoVmInfo;
-  repoId?: string;
-  isAgentRunning: boolean;
-}) {
+function AppPreview({ metadata }: { metadata: RepoVmInfo }) {
   const [extraTerminals, setExtraTerminals] = useState<TerminalTab[]>([]);
   const [activeTab, setActiveTab] = useState("dev-server");
   const [counter, setCounter] = useState(1);
@@ -445,8 +381,6 @@ function AppPreview({
         <BrowserToolbar
           previewUrl={metadata.previewUrl}
           iframeRef={iframeRef}
-          repoId={repoId}
-          isAgentRunning={isAgentRunning}
         />
         <div className="relative min-h-0 flex-1">
           {!iframeLoaded && (
@@ -542,13 +476,9 @@ function AppPreview({
 function BrowserToolbar({
   previewUrl,
   iframeRef,
-  repoId,
-  isAgentRunning,
 }: {
   previewUrl: string;
   iframeRef: React.RefObject<HTMLIFrameElement | null>;
-  repoId?: string;
-  isAgentRunning: boolean;
 }) {
   const [urlValue, setUrlValue] = useState(() => {
     try {
@@ -642,7 +572,6 @@ function BrowserToolbar({
           aria-label="URL path"
         />
       </form>
-      <DeploymentStatusBadge repoId={repoId} isAgentRunning={isAgentRunning} />
     </div>
   );
 }

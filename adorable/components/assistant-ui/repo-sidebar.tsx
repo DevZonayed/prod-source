@@ -1,7 +1,14 @@
 import * as React from "react";
 import { Sidebar, useSidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { ListTreeIcon, PlusIcon, RocketIcon } from "lucide-react";
+import {
+  CheckIcon,
+  CircleDashedIcon,
+  ListTreeIcon,
+  PlusIcon,
+  RocketIcon,
+  XIcon,
+} from "lucide-react";
 
 export type RepoDeployment = {
   commitSha: string;
@@ -33,6 +40,10 @@ export type RepoItem = {
   vm: RepoVmInfo | null;
   conversations: RepoConversation[];
   deployments: RepoDeployment[];
+};
+
+const toDisplayConversationTitle = (title: string) => {
+  return /^Conversation\s+\d+$/i.test(title.trim()) ? "" : title;
 };
 
 const AdorableLogo = () => (
@@ -199,6 +210,9 @@ export function RepoSidebar({
                           const isActive =
                             selectedRepoId === repo.id &&
                             selectedConversationId === conversation.id;
+                          const displayTitle = toDisplayConversationTitle(
+                            conversation.title,
+                          );
 
                           return (
                             <button
@@ -213,9 +227,13 @@ export function RepoSidebar({
                                   : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                               }`}
                             >
-                              <span className="truncate">
-                                {conversation.title}
-                              </span>
+                              {displayTitle ? (
+                                <span className="truncate">{displayTitle}</span>
+                              ) : (
+                                <span className="truncate text-muted-foreground/50">
+                                  &nbsp;
+                                </span>
+                              )}
                             </button>
                           );
                         })}
@@ -267,6 +285,18 @@ function DeploymentTimelineList({ items }: { items: RepoDeployment[] }) {
           key={`${entry.commitSha}-${entry.url}`}
           className="space-y-1.5 rounded-md border p-2"
         >
+          <div className="flex items-center gap-1.5 text-[10px] tracking-wide text-muted-foreground uppercase">
+            {entry.state === "deploying" ? (
+              <CircleDashedIcon className="size-3 animate-spin" />
+            ) : entry.state === "live" ? (
+              <CheckIcon className="size-3" />
+            ) : entry.state === "failed" ? (
+              <XIcon className="size-3" />
+            ) : (
+              <RocketIcon className="size-3" />
+            )}
+            <span>{entry.state}</span>
+          </div>
           <a
             href={entry.url}
             target="_blank"
@@ -282,21 +312,30 @@ function DeploymentTimelineList({ items }: { items: RepoDeployment[] }) {
           >
             {entry.commitMessage}
           </div>
-          <a
-            href={entry.url}
-            target="_blank"
-            rel="noreferrer"
-            className="block h-20 cursor-pointer overflow-hidden rounded border bg-background"
-            title={`Open ${entry.domain}`}
-          >
-            <iframe
-              src={entry.url}
-              className="pointer-events-none block h-[500%] w-[500%] origin-top-left scale-[0.2] border-0"
-              loading="lazy"
-              scrolling="no"
-              title={`deployment-${entry.commitSha}`}
-            />
-          </a>
+          {entry.state === "deploying" ? (
+            <div className="flex h-20 items-center justify-center rounded border bg-background">
+              <div className="flex items-center gap-1.5 text-[10px] tracking-wide text-muted-foreground uppercase">
+                <CircleDashedIcon className="size-3 animate-spin" />
+                <span>Deploying preview…</span>
+              </div>
+            </div>
+          ) : (
+            <a
+              href={entry.url}
+              target="_blank"
+              rel="noreferrer"
+              className="block h-20 cursor-pointer overflow-hidden rounded border bg-background"
+              title={`Open ${entry.domain}`}
+            >
+              <iframe
+                src={entry.url}
+                className="pointer-events-none block h-[500%] w-[500%] origin-top-left scale-[0.2] border-0"
+                loading="lazy"
+                scrolling="no"
+                title={`deployment-${entry.commitSha}`}
+              />
+            </a>
+          )}
         </div>
       ))}
     </div>

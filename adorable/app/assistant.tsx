@@ -210,6 +210,21 @@ export const Assistant = ({
 
   const runtimeKey = `${chatSessionIdRef.current}:${runtimeVersion}`;
 
+  const handleThreadStateChange = useCallback(
+    (next: ThreadState) => {
+      onThreadStateChange?.(next);
+      window.dispatchEvent(
+        new CustomEvent("adorable:thread-state", {
+          detail: {
+            repoId: activeRepoIdRef.current,
+            isRunning: next.isRunning,
+          },
+        }),
+      );
+    },
+    [onThreadStateChange],
+  );
+
   const dispatchReposUpdated = useCallback(() => {
     const repoId = activeRepoIdRef.current;
     if (!repoId) return;
@@ -273,7 +288,7 @@ export const Assistant = ({
 
   return (
     <AssistantRuntimeProvider key={runtimeKey} runtime={runtime}>
-      <ThreadStateBridge onThreadStateChange={onThreadStateChange} />
+      <ThreadStateBridge onThreadStateChange={handleThreadStateChange} />
       <Thread />
     </AssistantRuntimeProvider>
   );
