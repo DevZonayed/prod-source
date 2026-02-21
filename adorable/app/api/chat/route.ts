@@ -96,7 +96,7 @@ const createAdorableMetadata = async (): Promise<AdorableMetadata> => {
     recreate: true,
     workdir: WORKDIR,
     persistence: {
-      type: "sticky",
+      type: "persistent",
     },
     git: {
       repos: [
@@ -175,7 +175,7 @@ export async function POST(req: Request) {
 
   const result = streamText({
     system: SYSTEM_PROMPT,
-    model: openai.responses(MODEL),
+    model: openai.responses("gpt-5.2-codex"),
     messages: await convertToModelMessages(messages),
     tools,
     providerOptions: {
@@ -192,3 +192,5 @@ export async function POST(req: Request) {
     messageMetadata: createMessageMetadata(resolvedMetadata),
   });
 }
+
+// https://402480c7-5fbd-466e-9837-baeb1a6247f5:QLZNWhHtPWPjhuKS.WHq7tDcr57wFVvDH@git.freestyle.sh/00a867c9-30d5-41a6-b0e9-ac9fa75e378b
