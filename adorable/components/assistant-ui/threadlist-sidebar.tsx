@@ -1,14 +1,9 @@
 import * as React from "react";
 import { useAuiState } from "@assistant-ui/react";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarHeader,
-  SidebarRail,
-} from "@/components/ui/sidebar";
+import { Sidebar, useSidebar } from "@/components/ui/sidebar";
 import { ThreadList } from "@/components/assistant-ui/thread-list";
 import { ThreadListPrimitive } from "@assistant-ui/react";
-import { PlusIcon } from "lucide-react";
+import { ListTreeIcon, PlusIcon, RocketIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type AdorableMetadata = {
@@ -57,6 +52,7 @@ export function ThreadListSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
   const [tab, setTab] = React.useState<"threads" | "deployments">("threads");
+  const { open, setOpen } = useSidebar();
   const metadata = useAuiState<AdorableMetadata | undefined>(({ thread }) => {
     for (let i = thread.messages.length - 1; i >= 0; i -= 1) {
       const m = thread.messages[i]?.metadata?.custom?.adorable as
@@ -67,54 +63,75 @@ export function ThreadListSidebar({
     return undefined;
   });
 
+  const onTabClick = (nextTab: "threads" | "deployments") => {
+    if (open && tab === nextTab) {
+      setOpen(false);
+      return;
+    }
+
+    setTab(nextTab);
+    setOpen(true);
+  };
+
   return (
-    <Sidebar {...props}>
-      <SidebarHeader className="relative border-b px-3 py-2.5">
-        <ThreadListPrimitive.New asChild>
-          <Button
-            variant="ghost"
-            className="flex h-9 w-full items-center justify-between gap-2 rounded-lg px-2.5 text-muted-foreground hover:text-foreground"
-          >
-            <span className="flex items-center gap-2">
-              <AdorableLogo />
-              <span className="text-[13px] font-medium">Adorable</span>
-            </span>
-            <PlusIcon className="size-3.5" />
-          </Button>
-        </ThreadListPrimitive.New>
-      </SidebarHeader>
-      <SidebarContent className="px-1.5 pt-1.5">
-        <div className="mb-1 flex items-center gap-1 px-1">
+    <Sidebar collapsible="icon" {...props}>
+      <div className="flex h-full">
+        <div className="flex w-12 shrink-0 flex-col items-center border-r py-2">
           <button
             type="button"
-            onClick={() => setTab("threads")}
-            className={`h-7 rounded-md px-2 text-xs transition-colors ${
-              tab === "threads"
+            onClick={() => onTabClick("threads")}
+            title="Threads"
+            aria-label="Threads"
+            className={`mb-1 inline-flex size-8 items-center justify-center rounded-md transition-colors ${
+              open && tab === "threads"
                 ? "bg-muted text-foreground"
                 : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
             }`}
           >
-            Threads
+            <ListTreeIcon className="size-4" />
           </button>
           <button
             type="button"
-            onClick={() => setTab("deployments")}
-            className={`h-7 rounded-md px-2 text-xs transition-colors ${
-              tab === "deployments"
+            onClick={() => onTabClick("deployments")}
+            title="Deployments"
+            aria-label="Deployments"
+            className={`inline-flex size-8 items-center justify-center rounded-md transition-colors ${
+              open && tab === "deployments"
                 ? "bg-muted text-foreground"
                 : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
             }`}
           >
-            Deployments
+            <RocketIcon className="size-4" />
           </button>
         </div>
-        {tab === "threads" ? (
-          <ThreadList />
-        ) : (
-          <DeploymentTimelineList repoId={metadata?.repoId} />
-        )}
-      </SidebarContent>
-      <SidebarRail />
+
+        <div className="min-h-0 min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="relative border-b px-3 py-2.5">
+              <ThreadListPrimitive.New asChild>
+                <Button
+                  variant="ghost"
+                  className="flex h-9 w-full items-center justify-between gap-2 rounded-lg px-2.5 text-muted-foreground hover:text-foreground"
+                >
+                  <span className="flex items-center gap-2">
+                    <AdorableLogo />
+                    <span className="text-[13px] font-medium">Adorable</span>
+                  </span>
+                  <PlusIcon className="size-3.5" />
+                </Button>
+              </ThreadListPrimitive.New>
+            </div>
+
+            <div className="min-h-0 flex-1 px-1.5 pt-1.5">
+              {tab === "threads" ? (
+                <ThreadList />
+              ) : (
+                <DeploymentTimelineList repoId={metadata?.repoId} />
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </Sidebar>
   );
 }
@@ -160,7 +177,7 @@ function DeploymentTimelineList({ repoId }: { repoId?: string }) {
   }
 
   return (
-    <div className="space-y-3 overflow-x-hidden overflow-y-auto px-1 pb-2">
+    <div className="h-full space-y-3 overflow-x-hidden overflow-y-auto px-1 pb-2">
       {items.map((entry) => (
         <div
           key={entry.commitSha}
