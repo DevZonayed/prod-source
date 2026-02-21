@@ -107,8 +107,7 @@ export function RepoWorkspaceShell({
   const selectedRepo = repoId
     ? (repos.find((repo) => repo.id === repoId) ?? null)
     : null;
-  const hasPreview = Boolean(selectedRepo?.vm?.previewUrl);
-  const showPreview = hasPreview && Boolean(repoId);
+  const showWorkspacePanel = Boolean(repoId);
 
   const onSelectConversation = useCallback(
     (nextRepoId: string, conversationId: string) => {
@@ -134,7 +133,7 @@ export function RepoWorkspaceShell({
           <div
             className="grid h-dvh transition-[grid-template-columns] duration-500 ease-in-out"
             style={{
-              gridTemplateColumns: showPreview ? "1fr 1fr" : "1fr 0fr",
+              gridTemplateColumns: showWorkspacePanel ? "1fr 1fr" : "1fr 0fr",
             }}
           >
             <div className="relative min-w-0 overflow-hidden">
@@ -144,10 +143,12 @@ export function RepoWorkspaceShell({
             <div
               className={cn(
                 "min-w-0 overflow-hidden border-l transition-opacity duration-500",
-                showPreview ? "opacity-100" : "pointer-events-none opacity-0",
+                showWorkspacePanel
+                  ? "opacity-100"
+                  : "pointer-events-none opacity-0",
               )}
             >
-              {showPreview &&
+              {showWorkspacePanel &&
                 (selectedRepo?.vm?.previewUrl ? (
                   <AppPreview
                     repoId={repoId ?? undefined}
