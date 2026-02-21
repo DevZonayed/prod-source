@@ -69,6 +69,7 @@ export function RepoSidebar({
   onSelectConversation,
   onCreateRepo,
   onCreateConversation,
+  collapsible = "icon",
 }: {
   repos: RepoItem[];
   selectedRepoId: string | null;
@@ -76,6 +77,7 @@ export function RepoSidebar({
   onSelectConversation: (repoId: string, conversationId: string) => void;
   onCreateRepo: () => Promise<void>;
   onCreateConversation: (repoId: string) => Promise<void>;
+  collapsible?: "icon" | "offcanvas";
 }) {
   const [tab, setTab] = React.useState<"threads" | "deployments">("threads");
   const [creatingRepo, setCreatingRepo] = React.useState(false);
@@ -103,7 +105,7 @@ export function RepoSidebar({
   };
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible={collapsible}>
       <div className="flex h-full">
         <div className="flex w-12 shrink-0 flex-col items-center border-r py-2">
           <button

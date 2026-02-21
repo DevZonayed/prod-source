@@ -35,6 +35,7 @@ export const Assistant = ({
   const [seedMessages, setSeedMessages] = useState<UIMessage[]>(
     resolvedInitialMessages,
   );
+  const [runtimeVersion, setRuntimeVersion] = useState(0);
   const [localRepoId, setLocalRepoId] = useState<string | null>(selectedRepoId);
   const [localConversationId, setLocalConversationId] = useState<string | null>(
     selectedConversationId,
@@ -72,6 +73,23 @@ export const Assistant = ({
     onActiveConversationChangeRef.current = onActiveConversationChange;
   }, [onActiveConversationChange]);
 
+  useEffect(() => {
+    const handleGoHome = () => {
+      setSeedMessages(EMPTY_MESSAGES);
+      setLocalRepoId(null);
+      setLocalConversationId(null);
+      activeRepoIdRef.current = null;
+      activeConversationIdRef.current = null;
+      chatSessionIdRef.current = `home:draft:${Date.now()}`;
+      setRuntimeVersion((version) => version + 1);
+    };
+
+    window.addEventListener("adorable:go-home", handleGoHome);
+    return () => {
+      window.removeEventListener("adorable:go-home", handleGoHome);
+    };
+  }, []);
+
   const ensureActiveConversation = useCallback(async () => {
     const activeRepoId = activeRepoIdRef.current;
     const activeConversationId = activeConversationIdRef.current;
@@ -106,6 +124,11 @@ export const Assistant = ({
       setLocalConversationId(conversationId);
       activeConversationIdRef.current = conversationId;
       onActiveConversationChangeRef.current?.(activeRepoId, conversationId);
+      window.dispatchEvent(
+        new CustomEvent("adorable:active-conversation", {
+          detail: { repoId: activeRepoId, conversationId },
+        }),
+      );
 
       return {
         repoId: activeRepoId,
@@ -133,6 +156,11 @@ export const Assistant = ({
     activeRepoIdRef.current = repoId;
     activeConversationIdRef.current = conversationId;
     onActiveConversationChangeRef.current?.(repoId, conversationId);
+    window.dispatchEvent(
+      new CustomEvent("adorable:active-conversation", {
+        detail: { repoId, conversationId },
+      }),
+    );
 
     return {
       repoId,
@@ -140,7 +168,7 @@ export const Assistant = ({
     };
   }, []);
 
-  const runtimeKey = chatSessionIdRef.current;
+  const runtimeKey = `${chatSessionIdRef.current}:${runtimeVersion}`;
 
   const chat = useChat<UIMessage>({
     id: runtimeKey,

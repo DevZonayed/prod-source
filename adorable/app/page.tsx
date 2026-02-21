@@ -1,5 +1,5 @@
-import { HomeWorkspace } from "./home-workspace";
+import { Assistant } from "./assistant";
 
 export default function Home() {
-  return <HomeWorkspace />;
+  return <Assistant />;
 }

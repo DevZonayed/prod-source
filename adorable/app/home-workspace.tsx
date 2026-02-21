@@ -9,13 +9,11 @@ export function HomeWorkspace() {
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(null);
-  const [sidebarVisible, setSidebarVisible] = useState(false);
 
   const handleActiveConversationChange = useCallback(
     (repoId: string, conversationId: string) => {
       setActiveRepoId(repoId);
       setActiveConversationId(conversationId);
-      setSidebarVisible(true);
     },
     [],
   );
@@ -24,7 +22,6 @@ export function HomeWorkspace() {
     <RepoWorkspaceShell
       repoId={activeRepoId}
       selectedConversationIdOverride={activeConversationId}
-      sidebarVisible={sidebarVisible}
     >
       <Assistant
         selectedRepoId={activeRepoId}

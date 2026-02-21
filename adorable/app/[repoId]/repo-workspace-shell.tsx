@@ -8,11 +8,7 @@ import {
   type RepoItem,
   type RepoVmInfo,
 } from "@/components/assistant-ui/repo-sidebar";
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -40,12 +36,10 @@ export function RepoWorkspaceShell({
   repoId,
   children,
   selectedConversationIdOverride,
-  sidebarVisible = true,
 }: {
   repoId: string | null;
   children: React.ReactNode;
   selectedConversationIdOverride?: string | null;
-  sidebarVisible?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -94,6 +88,7 @@ export function RepoWorkspaceShell({
   }, [loadRepos, repoId]);
 
   const handleCreateRepo = useCallback(async () => {
+    window.dispatchEvent(new Event("adorable:go-home"));
     router.push("/");
   }, [router]);
 
@@ -117,18 +112,17 @@ export function RepoWorkspaceShell({
   );
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={true}>
       <div className="flex h-dvh w-full pr-0.5">
-        {sidebarVisible ? (
-          <RepoSidebar
-            repos={repos}
-            selectedRepoId={repoId}
-            selectedConversationId={selectedConversationId}
-            onSelectConversation={onSelectConversation}
-            onCreateRepo={handleCreateRepo}
-            onCreateConversation={handleCreateConversation}
-          />
-        ) : null}
+        <RepoSidebar
+          repos={repos}
+          selectedRepoId={repoId}
+          selectedConversationId={selectedConversationId}
+          onSelectConversation={onSelectConversation}
+          onCreateRepo={handleCreateRepo}
+          onCreateConversation={handleCreateConversation}
+          collapsible="icon"
+        />
         <SidebarInset>
           <div
             className="grid h-dvh transition-[grid-template-columns] duration-500 ease-in-out"
@@ -136,10 +130,7 @@ export function RepoWorkspaceShell({
               gridTemplateColumns: showWorkspacePanel ? "1fr 1fr" : "1fr 0fr",
             }}
           >
-            <div className="relative min-w-0 overflow-hidden">
-              <SidebarTrigger className="absolute top-2.5 left-2.5 z-10" />
-              {children}
-            </div>
+            <div className="relative min-w-0 overflow-hidden">{children}</div>
             <div
               className={cn(
                 "min-w-0 overflow-hidden border-l transition-opacity duration-500",
