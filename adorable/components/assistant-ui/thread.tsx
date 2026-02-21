@@ -63,8 +63,10 @@ export const Thread: FC = () => {
       }}
     >
       <ThreadPrimitive.Viewport
-        turnAnchor="top"
-        className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll scroll-smooth px-4 pt-4"
+        // turnAnchor="bottom"
+        // autoScroll
+        className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-hidden overflow-y-scroll px-4 pt-4"
+        // style={{ overflowAnchor: "none" }}
       >
         <AssistantIf condition={({ thread }) => thread.isEmpty}>
           <ThreadWelcome />
@@ -189,7 +191,6 @@ const Composer: FC = () => {
           placeholder="Send a message..."
           className="aui-composer-input mb-1 max-h-32 min-h-14 w-full resize-none bg-transparent px-4 pt-2 pb-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-0"
           rows={1}
-          autoFocus
           aria-label="Message input"
         />
         <ComposerAction />

@@ -157,7 +157,7 @@ export const BashToolCard: ToolCallMessagePartComponent = ({
           <TerminalIcon className="size-3.5 shrink-0 text-muted-foreground" />
         )
       }
-      label="Ran"
+      label={running ? "Running" : "Ran"}
       detail={cmd}
       status={status}
       expandContent={
@@ -183,10 +183,11 @@ export const ReadFileToolCard: ToolCallMessagePartComponent = ({
 }) => {
   const a = parse(argsText);
   const r = obj(result);
+  const running = status?.type === "running";
 
   return (
     <ToolLine
-      label="Read"
+      label={running ? "Reading" : "Read"}
       detail={str(a.file)}
       status={status}
       expandContent={r.content ? <DetailBlock data={r.content} /> : undefined}
@@ -199,8 +200,15 @@ export const WriteFileToolCard: ToolCallMessagePartComponent = ({
   status,
 }) => {
   const a = parse(argsText);
+  const running = status?.type === "running";
 
-  return <ToolLine label="Wrote" detail={str(a.file)} status={status} />;
+  return (
+    <ToolLine
+      label={running ? "Writing" : "Wrote"}
+      detail={str(a.file)}
+      status={status}
+    />
+  );
 };
 
 export const ListFilesToolCard: ToolCallMessagePartComponent = ({
@@ -210,10 +218,11 @@ export const ListFilesToolCard: ToolCallMessagePartComponent = ({
 }) => {
   const a = parse(argsText);
   const r = obj(result);
+  const running = status?.type === "running";
 
   return (
     <ToolLine
-      label="Listed"
+      label={running ? "Listing" : "Listed"}
       detail={str(a.path)}
       status={status}
       expandContent={r.stdout ? <DetailBlock data={r.stdout} /> : undefined}
@@ -228,10 +237,11 @@ export const SearchFilesToolCard: ToolCallMessagePartComponent = ({
 }) => {
   const a = parse(argsText);
   const r = obj(result);
+  const running = status?.type === "running";
 
   return (
     <ToolLine
-      label="Searched"
+      label={running ? "Searching" : "Searched"}
       detail={str(a.query) ? `"${a.query}"` : undefined}
       status={status}
       expandContent={r.stdout ? <DetailBlock data={r.stdout} /> : undefined}
@@ -244,8 +254,15 @@ export const ReplaceInFileToolCard: ToolCallMessagePartComponent = ({
   status,
 }) => {
   const a = parse(argsText);
+  const running = status?.type === "running";
 
-  return <ToolLine label="Edited" detail={str(a.file)} status={status} />;
+  return (
+    <ToolLine
+      label={running ? "Editing" : "Edited"}
+      detail={str(a.file)}
+      status={status}
+    />
+  );
 };
 
 export const AppendToFileToolCard: ToolCallMessagePartComponent = ({
@@ -253,8 +270,15 @@ export const AppendToFileToolCard: ToolCallMessagePartComponent = ({
   status,
 }) => {
   const a = parse(argsText);
+  const running = status?.type === "running";
 
-  return <ToolLine label="Appended" detail={str(a.file)} status={status} />;
+  return (
+    <ToolLine
+      label={running ? "Appending" : "Appended"}
+      detail={str(a.file)}
+      status={status}
+    />
+  );
 };
 
 export const MakeDirectoryToolCard: ToolCallMessagePartComponent = ({
@@ -262,8 +286,15 @@ export const MakeDirectoryToolCard: ToolCallMessagePartComponent = ({
   status,
 }) => {
   const a = parse(argsText);
+  const running = status?.type === "running";
 
-  return <ToolLine label="Created dir" detail={str(a.path)} status={status} />;
+  return (
+    <ToolLine
+      label={running ? "Creating dir" : "Created dir"}
+      detail={str(a.path)}
+      status={status}
+    />
+  );
 };
 
 export const MovePathToolCard: ToolCallMessagePartComponent = ({
@@ -271,10 +302,11 @@ export const MovePathToolCard: ToolCallMessagePartComponent = ({
   status,
 }) => {
   const a = parse(argsText);
+  const running = status?.type === "running";
 
   return (
     <ToolLine
-      label="Moved"
+      label={running ? "Moving" : "Moved"}
       detail={str(a.from) && str(a.to) ? `${a.from} → ${a.to}` : str(a.from)}
       status={status}
     />
@@ -286,8 +318,15 @@ export const DeletePathToolCard: ToolCallMessagePartComponent = ({
   status,
 }) => {
   const a = parse(argsText);
+  const running = status?.type === "running";
 
-  return <ToolLine label="Deleted" detail={str(a.path)} status={status} />;
+  return (
+    <ToolLine
+      label={running ? "Deleting" : "Deleted"}
+      detail={str(a.path)}
+      status={status}
+    />
+  );
 };
 
 export const CommitToolCard: ToolCallMessagePartComponent = ({
@@ -374,12 +413,13 @@ export const DevServerLogsToolCard: ToolCallMessagePartComponent = ({
 }) => {
   const a = parse(argsText);
   const r = obj(result);
+  const running = status?.type === "running";
   const maxLines =
     typeof a.maxLines === "number" ? `${a.maxLines} lines` : undefined;
 
   return (
     <ToolLine
-      label="Dev logs"
+      label={running ? "Reading dev logs" : "Dev logs"}
       detail={maxLines ? `last ${maxLines}` : undefined}
       status={status}
       expandContent={r.logs ? <DetailBlock data={r.logs} /> : undefined}

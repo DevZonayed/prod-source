@@ -95,6 +95,9 @@ const createAdorableMetadata = async (): Promise<AdorableMetadata> => {
     snapshot: spec,
     recreate: true,
     workdir: WORKDIR,
+    persistence: {
+      type: "sticky",
+    },
     git: {
       repos: [
         {

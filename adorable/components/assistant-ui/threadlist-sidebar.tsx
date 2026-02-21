@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useAuiState } from "@assistant-ui/react";
 import {
   Sidebar,
   SidebarContent,
@@ -9,6 +10,20 @@ import { ThreadList } from "@/components/assistant-ui/thread-list";
 import { ThreadListPrimitive } from "@assistant-ui/react";
 import { PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+type AdorableMetadata = {
+  repoId?: string;
+};
+
+type DeploymentTimelineEntry = {
+  commitSha: string;
+  commitMessage: string;
+  commitDate: string;
+  domain: string;
+  url: string;
+  deploymentId: string | null;
+  state: "idle" | "deploying" | "live" | "failed";
+};
 
 const AdorableLogo = () => (
   <svg
@@ -41,6 +56,17 @@ const AdorableLogo = () => (
 export function ThreadListSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
+  const [tab, setTab] = React.useState<"threads" | "deployments">("threads");
+  const metadata = useAuiState<AdorableMetadata | undefined>(({ thread }) => {
+    for (let i = thread.messages.length - 1; i >= 0; i -= 1) {
+      const m = thread.messages[i]?.metadata?.custom?.adorable as
+        | AdorableMetadata
+        | undefined;
+      if (m) return m;
+    }
+    return undefined;
+  });
+
   return (
     <Sidebar {...props}>
       <SidebarHeader className="relative border-b px-3 py-2.5">
@@ -58,9 +84,125 @@ export function ThreadListSidebar({
         </ThreadListPrimitive.New>
       </SidebarHeader>
       <SidebarContent className="px-1.5 pt-1.5">
-        <ThreadList />
+        <div className="mb-1 flex items-center gap-1 px-1">
+          <button
+            type="button"
+            onClick={() => setTab("threads")}
+            className={`h-7 rounded-md px-2 text-xs transition-colors ${
+              tab === "threads"
+                ? "bg-muted text-foreground"
+                : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            }`}
+          >
+            Threads
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("deployments")}
+            className={`h-7 rounded-md px-2 text-xs transition-colors ${
+              tab === "deployments"
+                ? "bg-muted text-foreground"
+                : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            }`}
+          >
+            Deployments
+          </button>
+        </div>
+        {tab === "threads" ? (
+          <ThreadList />
+        ) : (
+          <DeploymentTimelineList repoId={metadata?.repoId} />
+        )}
       </SidebarContent>
       <SidebarRail />
     </Sidebar>
+  );
+}
+
+function DeploymentTimelineList({ repoId }: { repoId?: string }) {
+  const [items, setItems] = React.useState<DeploymentTimelineEntry[]>([]);
+
+  React.useEffect(() => {
+    if (!repoId) {
+      setItems([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const params = new URLSearchParams({ repoId, limit: "10" });
+        const response = await fetch(
+          `/api/deployment-timeline?${params.toString()}`,
+        );
+        if (!response.ok) return;
+        const data = await response.json();
+        if (cancelled) return;
+        setItems(Array.isArray(data.timeline) ? data.timeline : []);
+      } catch {}
+    };
+
+    poll();
+    const interval = window.setInterval(poll, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [repoId]);
+
+  if (!repoId) {
+    return (
+      <div className="px-2 py-3 text-xs text-muted-foreground">
+        No project yet.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 overflow-x-hidden overflow-y-auto px-1 pb-2">
+      {items.map((entry) => (
+        <div
+          key={entry.commitSha}
+          className="space-y-1.5 rounded-md border p-2"
+        >
+          <a
+            href={entry.url}
+            target="_blank"
+            rel="noreferrer"
+            className="block truncate text-xs font-medium text-foreground hover:underline"
+            title={entry.url}
+          >
+            {entry.domain}
+          </a>
+          <div
+            className="truncate text-[10px] text-muted-foreground"
+            title={entry.commitMessage}
+          >
+            {entry.commitMessage}
+          </div>
+          <a
+            href={entry.url}
+            target="_blank"
+            rel="noreferrer"
+            className="block h-20 cursor-pointer overflow-hidden rounded border bg-background"
+            title={`Open ${entry.domain}`}
+          >
+            <iframe
+              src={entry.url}
+              className="pointer-events-none block h-[500%] w-[500%] origin-top-left scale-[0.2] border-0"
+              loading="lazy"
+              scrolling="no"
+              title={`deployment-${entry.commitSha}`}
+            />
+          </a>
+        </div>
+      ))}
+      {items.length === 0 && (
+        <div className="px-2 py-3 text-xs text-muted-foreground">
+          No deployments yet.
+        </div>
+      )}
+    </div>
   );
 }
