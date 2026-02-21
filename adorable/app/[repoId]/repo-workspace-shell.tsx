@@ -117,8 +117,11 @@ export function RepoWorkspaceShell({
   );
 
   return (
-    <SidebarProvider defaultOpen={true}>
-      <div className="flex h-dvh w-full pr-0.5">
+    <SidebarProvider
+      defaultOpen={true}
+      className="h-full min-h-0 overflow-hidden"
+    >
+      <div className="flex h-full min-h-0 w-full overflow-hidden">
         <RepoSidebar
           repos={repos}
           selectedRepoId={repoId}
@@ -130,7 +133,7 @@ export function RepoWorkspaceShell({
         />
         <SidebarInset>
           <div
-            className="grid h-dvh transition-[grid-template-columns] duration-500 ease-in-out"
+            className="grid h-full min-h-0 transition-[grid-template-columns] duration-500 ease-in-out"
             style={{
               gridTemplateColumns: showWorkspacePanel ? "1fr 1fr" : "1fr 0fr",
             }}
