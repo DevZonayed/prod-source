@@ -1,196 +1,83 @@
-import { openai, OpenAIChatLanguageModelOptions } from "@ai-sdk/openai";
-import {
-  streamText,
-  convertToModelMessages,
-  type UIMessage,
-  stepCountIs,
-} from "ai";
-import { freestyle, VmSpec } from "freestyle-sandboxes";
-import { VmDevServer } from "@freestyle-sh/with-dev-server";
-import { VmPtySession } from "@freestyle-sh/with-pty";
-import { VmWebTerminal } from "@freestyle-sh/with-ttyd";
+import { type UIMessage } from "ai";
+import { freestyle } from "freestyle-sandboxes";
 import { createTools as createVmTools } from "@/lib/create-tools";
-import {
-  VM_PORT,
-  WORKDIR,
-  DEV_COMMAND_TERMINAL_PORT,
-  TEMPLATE_REPO,
-  MODEL,
-  ADDITIONAL_TERMINALS_PORT,
-} from "@/lib/vars";
+import { streamLlmResponse } from "@/lib/llm-provider";
+import { adorableVmSpec } from "@/lib/adorable-vm";
+import { getOrCreateIdentitySession } from "@/lib/identity-session";
+import { readRepoMetadata, saveConversationMessages } from "@/lib/repo-storage";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt";
 
-type AdorableMetadata = {
-  vmId: string;
-  repoId: string;
-  previewUrl: string;
-  devCommandTerminalUrl: string;
-  additionalTerminalsUrl: string;
-};
-
-type MessageMetadata = {
-  custom?: {
-    adorable?: AdorableMetadata;
-  };
-};
-const devCommandPty = new VmPtySession({
-  sessionId: "adorable-dev-command",
-});
-
-const spec = new VmSpec({
-  with: {
-    devCommandPty,
-    devServer: new VmDevServer({
-      workdir: WORKDIR,
-      templateRepo: TEMPLATE_REPO,
-      devCommandPty,
-    }),
-    devCommandTerminal: new VmWebTerminal({
-      pty: devCommandPty,
-      port: DEV_COMMAND_TERMINAL_PORT,
-      theme: {
-        background: "#09090b",
-      },
-    }),
-    additionalTerminals: new VmWebTerminal({
-      cwd: WORKDIR,
-      port: ADDITIONAL_TERMINALS_PORT,
-    }),
-  },
-});
-
-const getAdorableMetadataFromMessage = (
-  message: UIMessage,
-): AdorableMetadata | null => {
-  const metadata = message.metadata as MessageMetadata | undefined;
-  return metadata?.custom?.adorable ?? null;
-};
-
-const getPersistedAdorableMetadata = (
-  messages: UIMessage[],
-): AdorableMetadata | null => {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const metadata = getAdorableMetadataFromMessage(messages[i]);
-    if (metadata) return metadata;
-  }
-
-  return null;
-};
-
-const createAdorableMetadata = async (): Promise<AdorableMetadata> => {
-  const { repoId } = await freestyle.git.repos.create({
-    import: {
-      commitMessage: "Initial commit",
-      url: TEMPLATE_REPO,
-      type: "git",
-    },
-  });
-
-  const domain = `${crypto.randomUUID()}-adorable.style.dev`;
-  const devCommandTerminalDomain = `dev-command-${domain}`;
-  const additionalTerminalsDomain = `terminals-${domain}`;
-  console.log("Creating VM with domain:", domain);
-
-  const { vmId } = await freestyle.vms.create({
-    snapshot: spec,
-    recreate: true,
-    workdir: WORKDIR,
-    persistence: {
-      type: "persistent",
-    },
-    git: {
-      repos: [
-        {
-          path: WORKDIR,
-          repo: repoId,
-        },
-      ],
-      config: {
-        user: {
-          name: "Adorable",
-          email: "adorable@freestyle.sh",
-        },
-      },
-    },
-    domains: [
-      {
-        domain,
-        vmPort: VM_PORT,
-      },
-      {
-        domain: devCommandTerminalDomain,
-        vmPort: DEV_COMMAND_TERMINAL_PORT,
-      },
-      {
-        domain: additionalTerminalsDomain,
-        vmPort: ADDITIONAL_TERMINALS_PORT,
-      },
-    ],
-  });
-
-  return {
-    vmId,
-    repoId,
-    previewUrl: `https://${domain}`,
-    devCommandTerminalUrl: `https://${devCommandTerminalDomain}`,
-    additionalTerminalsUrl: `https://${additionalTerminalsDomain}`,
-  };
-};
-
-const createMessageMetadata = (
-  metadata: AdorableMetadata | null,
-): (({ part }: { part: { type: string } }) => MessageMetadata | undefined) => {
-  return ({ part }) => {
-    if (part.type !== "start" || !metadata) return undefined;
-
-    return {
-      custom: {
-        adorable: metadata,
-      },
-    };
-  };
-};
-
 export async function POST(req: Request) {
-  const { messages }: { messages: UIMessage[] } = await req.json();
+  const payload = (await req.json()) as {
+    messages?: UIMessage[];
+    repoId?: string;
+    conversationId?: string;
+  };
 
-  const persistedMetadata = getPersistedAdorableMetadata(messages);
-  const newMetadata =
-    messages.length === 1 ? await createAdorableMetadata() : null;
-  const resolvedMetadata = newMetadata ?? persistedMetadata;
+  const { repoId, conversationId } = payload;
+  const messages = Array.isArray(payload.messages)
+    ? payload.messages
+    : undefined;
 
-  const vmId = resolvedMetadata?.vmId;
-  if (!vmId) {
-    throw new Error("No VM is available to run commands.");
+  if (!repoId || !conversationId) {
+    return Response.json(
+      { error: "repoId and conversationId are required." },
+      { status: 400 },
+    );
   }
 
-  let vm = freestyle.vms.ref({
-    vmId,
-    spec: spec,
+  if (!messages) {
+    return Response.json(
+      { error: "messages must be an array." },
+      { status: 400 },
+    );
+  }
+
+  const { identity } = await getOrCreateIdentitySession();
+  const { repositories } = await identity.permissions.git.list({ limit: 200 });
+  const hasAccess = repositories.some((repo) => repo.id === repoId);
+
+  if (!hasAccess) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const metadata = await readRepoMetadata(repoId);
+  if (!metadata) {
+    return Response.json(
+      { error: "Repository metadata not found." },
+      { status: 404 },
+    );
+  }
+
+  await saveConversationMessages(repoId, metadata, conversationId, messages);
+
+  const vm = freestyle.vms.ref({
+    vmId: metadata.vm.vmId,
+    spec: adorableVmSpec,
   });
 
   const tools = createVmTools(vm, {
-    repoId: resolvedMetadata?.repoId,
+    repoId,
   });
 
-  const result = streamText({
+  const llm = await streamLlmResponse({
     system: SYSTEM_PROMPT,
-    model: openai.responses("gpt-5.2-codex"),
-    messages: await convertToModelMessages(messages),
+    messages,
     tools,
-    providerOptions: {
-      openai: {
-        reasoningEffort: "low",
-      } satisfies OpenAIChatLanguageModelOptions,
-    },
-    stopWhen: stepCountIs(100),
   });
 
-  return result.toUIMessageStreamResponse({
+  return llm.result.toUIMessageStreamResponse({
     sendReasoning: true,
     originalMessages: messages,
-    messageMetadata: createMessageMetadata(resolvedMetadata),
+    onFinish: async ({ messages: finalMessages }) => {
+      const latestMetadata = await readRepoMetadata(repoId);
+      if (!latestMetadata) return;
+      await saveConversationMessages(
+        repoId,
+        latestMetadata,
+        conversationId,
+        finalMessages,
+      );
+    },
   });
 }
-
-// https://402480c7-5fbd-466e-9837-baeb1a6247f5:QLZNWhHtPWPjhuKS.WHq7tDcr57wFVvDH@git.freestyle.sh/00a867c9-30d5-41a6-b0e9-ac9fa75e378b

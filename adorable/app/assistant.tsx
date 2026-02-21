@@ -1,22 +1,23 @@
 "use client";
 
-import {
-  AssistantRuntimeProvider,
-  AssistantCloud,
-  useAuiState,
-} from "@assistant-ui/react";
+import { AssistantRuntimeProvider, useAuiState } from "@assistant-ui/react";
 import {
   useChatRuntime,
   AssistantChatTransport,
 } from "@assistant-ui/react-ai-sdk";
+import { type UIMessage } from "ai";
 import { Thread } from "@/components/assistant-ui/thread";
+import {
+  RepoSidebar,
+  type RepoConversation,
+  type RepoVmInfo,
+} from "@/components/assistant-ui/repo-sidebar";
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import {
@@ -30,11 +31,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type AdorableMetadata = {
-  repoId?: string;
-  previewUrl?: string;
-  devCommandTerminalUrl?: string;
-  additionalTerminalsUrl?: string;
+type RepoItem = {
+  id: string;
+  name: string;
+  vm: RepoVmInfo | null;
+  conversations: RepoConversation[];
 };
 
 type DeploymentStatus = {
@@ -43,26 +44,235 @@ type DeploymentStatus = {
   commitSha: string | null;
 };
 
-const cloud = new AssistantCloud({
-  baseUrl: process.env["NEXT_PUBLIC_ASSISTANT_BASE_URL"]!,
-  anonymous: true,
-});
-
 export const Assistant = () => {
+  const [repos, setRepos] = useState<RepoItem[]>([]);
+  const [selectedRepoId, setSelectedRepoId] = useState<string | null>(null);
+  const [selectedConversationId, setSelectedConversationId] = useState<
+    string | null
+  >(null);
+  const [seedMessages, setSeedMessages] = useState<UIMessage[]>([]);
+  const [conversationSeedNonce, setConversationSeedNonce] = useState(0);
+
+  const selectedRepo = repos.find((repo) => repo.id === selectedRepoId) ?? null;
+
+  const loadRepos = useCallback(async () => {
+    const response = await fetch("/api/repos", { cache: "no-store" });
+    if (!response.ok) return;
+    const data = await response.json();
+
+    const nextRepos: RepoItem[] = Array.isArray(data.repositories)
+      ? data.repositories.map(
+          (repo: {
+            id: string;
+            name?: string;
+            metadata?: {
+              vm?: RepoVmInfo;
+              conversations?: RepoConversation[];
+            };
+          }) => ({
+            id: repo.id,
+            name: repo.name ?? "Untitled Repo",
+            vm: repo.metadata?.vm ?? null,
+            conversations: Array.isArray(repo.metadata?.conversations)
+              ? repo.metadata!.conversations
+              : [],
+          }),
+        )
+      : [];
+
+    setRepos(nextRepos);
+
+    if (!selectedRepoId && nextRepos[0]?.id) {
+      setSelectedRepoId(nextRepos[0].id);
+      setSelectedConversationId(nextRepos[0].conversations[0]?.id ?? null);
+    }
+  }, [selectedRepoId]);
+
+  useEffect(() => {
+    loadRepos();
+  }, [loadRepos]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadConversationMessages = async () => {
+      if (!selectedRepoId || !selectedConversationId) {
+        setSeedMessages([]);
+        setConversationSeedNonce((value) => value + 1);
+        return;
+      }
+
+      setSeedMessages([]);
+
+      const response = await fetch(
+        `/api/repos/${selectedRepoId}/conversations/${selectedConversationId}`,
+      );
+      if (!response.ok) {
+        if (cancelled) return;
+        setSeedMessages([]);
+        setConversationSeedNonce((value) => value + 1);
+        return;
+      }
+
+      const data = await response.json();
+      if (cancelled) return;
+      setSeedMessages(Array.isArray(data.messages) ? data.messages : []);
+      setConversationSeedNonce((value) => value + 1);
+    };
+
+    loadConversationMessages();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRepoId, selectedConversationId]);
+
+  const handleCreateRepo = useCallback(async () => {
+    const response = await fetch("/api/repos", { method: "POST" });
+    if (!response.ok) return;
+    const data = await response.json();
+    await loadRepos();
+
+    if (data.id && data.conversationId) {
+      setSelectedRepoId(data.id);
+      setSelectedConversationId(data.conversationId);
+    }
+  }, [loadRepos]);
+
+  const handleCreateConversation = useCallback(
+    async (repoId: string) => {
+      const response = await fetch(`/api/repos/${repoId}/conversations`, {
+        method: "POST",
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      await loadRepos();
+      if (data.conversationId) {
+        setSelectedRepoId(repoId);
+        setSelectedConversationId(data.conversationId);
+      }
+    },
+    [loadRepos],
+  );
+
+  const ensureActiveConversation = useCallback(async () => {
+    if (selectedRepoId && selectedConversationId) {
+      return {
+        repoId: selectedRepoId,
+        conversationId: selectedConversationId,
+      };
+    }
+
+    if (selectedRepoId) {
+      const selectedRepo = repos.find((repo) => repo.id === selectedRepoId);
+      const existingConversationId = selectedRepo?.conversations[0]?.id;
+
+      if (existingConversationId) {
+        setSelectedConversationId(existingConversationId);
+        return {
+          repoId: selectedRepoId,
+          conversationId: existingConversationId,
+        };
+      }
+
+      const response = await fetch(
+        `/api/repos/${selectedRepoId}/conversations`,
+        {
+          method: "POST",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          "Failed to create a conversation for the selected repo.",
+        );
+      }
+
+      const data = await response.json();
+      const conversationId = data.conversationId as string | undefined;
+
+      if (!conversationId) {
+        throw new Error("Conversation creation did not return an id.");
+      }
+
+      setSelectedConversationId(conversationId);
+      await loadRepos();
+
+      return {
+        repoId: selectedRepoId,
+        conversationId,
+      };
+    }
+
+    const response = await fetch("/api/repos", { method: "POST" });
+    if (!response.ok) {
+      throw new Error("Failed to create a repository for this chat.");
+    }
+
+    const data = await response.json();
+    const repoId = data.id as string | undefined;
+    const conversationId = data.conversationId as string | undefined;
+
+    if (!repoId || !conversationId) {
+      throw new Error("Repository creation did not return ids.");
+    }
+
+    setSelectedRepoId(repoId);
+    setSelectedConversationId(conversationId);
+    await loadRepos();
+
+    return {
+      repoId,
+      conversationId,
+    };
+  }, [loadRepos, repos, selectedConversationId, selectedRepoId]);
+
   const runtime = useChatRuntime({
-    cloud,
+    id: `${selectedRepoId ?? "none"}:${selectedConversationId ?? "none"}:${conversationSeedNonce}`,
     transport: new AssistantChatTransport({
       api: "/api/chat", // API route
+      prepareSendMessagesRequest: async (options) => {
+        const active = await ensureActiveConversation();
+
+        return {
+          body: {
+            ...options.body,
+            id: options.id,
+            messages: options.messages,
+            trigger: options.trigger,
+            messageId: options.messageId,
+            metadata: options.requestMetadata,
+            repoId: active.repoId,
+            conversationId: active.conversationId,
+          },
+        };
+      },
     }),
+    messages: seedMessages,
   });
 
+  const runtimeKey = `${selectedRepoId ?? "none"}:${selectedConversationId ?? "none"}:${conversationSeedNonce}`;
+
   return (
-    <AssistantRuntimeProvider runtime={runtime}>
+    <AssistantRuntimeProvider key={runtimeKey} runtime={runtime}>
       <SidebarProvider>
         <div className="flex h-dvh w-full pr-0.5">
-          <ThreadListSidebar />
+          <RepoSidebar
+            repos={repos}
+            selectedRepoId={selectedRepoId}
+            selectedConversationId={selectedConversationId}
+            onSelectConversation={(repoId, conversationId) => {
+              setSelectedRepoId(repoId);
+              setSelectedConversationId(conversationId);
+            }}
+            onCreateRepo={handleCreateRepo}
+            onCreateConversation={handleCreateConversation}
+          />
           <SidebarInset>
-            <MainContent />
+            <MainContent
+              selectedRepoId={selectedRepoId}
+              repoVm={selectedRepo?.vm ?? null}
+            />
           </SidebarInset>
         </div>
       </SidebarProvider>
@@ -70,20 +280,15 @@ export const Assistant = () => {
   );
 };
 
-function MainContent() {
+function MainContent({
+  selectedRepoId,
+  repoVm,
+}: {
+  selectedRepoId: string | null;
+  repoVm: RepoVmInfo | null;
+}) {
   const isEmpty = useAuiState(({ thread }) => thread.isEmpty);
-  const hasPreview = useAuiState(({ thread }) =>
-    thread.messages.some((message) => message.metadata?.custom?.adorable),
-  );
-  const metadata = useAuiState<AdorableMetadata | undefined>(({ thread }) => {
-    for (let i = thread.messages.length - 1; i >= 0; i -= 1) {
-      const m = thread.messages[i]?.metadata?.custom?.adorable as
-        | AdorableMetadata
-        | undefined;
-      if (m) return m;
-    }
-    return undefined;
-  });
+  const hasPreview = Boolean(repoVm?.previewUrl);
   const { setOpen, isMobile } = useSidebar();
   const wasEmptyRef = useRef(isEmpty);
 
@@ -111,7 +316,15 @@ function MainContent() {
           !isEmpty ? "opacity-100" : "pointer-events-none opacity-0",
         )}
       >
-        {!isEmpty && (hasPreview ? <AppPreview /> : <PreviewPlaceholder />)}
+        {!isEmpty &&
+          (repoVm?.previewUrl ? (
+            <AppPreview
+              repoId={selectedRepoId ?? undefined}
+              metadata={repoVm}
+            />
+          ) : (
+            <PreviewPlaceholder />
+          ))}
       </div>
     </div>
   );
@@ -272,16 +485,13 @@ type TerminalTab = {
   closable: boolean;
 };
 
-function AppPreview() {
-  const metadata = useAuiState<AdorableMetadata | undefined>(({ thread }) => {
-    for (let i = thread.messages.length - 1; i >= 0; i -= 1) {
-      const metadata = thread.messages[i]?.metadata?.custom?.adorable as
-        | AdorableMetadata
-        | undefined;
-      if (metadata) return metadata;
-    }
-    return undefined;
-  });
+function AppPreview({
+  metadata,
+  repoId,
+}: {
+  metadata: RepoVmInfo;
+  repoId?: string;
+}) {
   const isAgentRunning = useAuiState(({ thread }) => thread.isRunning);
 
   const [extraTerminals, setExtraTerminals] = useState<TerminalTab[]>([]);
@@ -343,7 +553,7 @@ function AppPreview() {
             <BrowserToolbar
               previewUrl={metadata.previewUrl}
               iframeRef={iframeRef}
-              repoId={metadata.repoId}
+              repoId={repoId}
               isAgentRunning={isAgentRunning}
             />
             <div className="relative min-h-0 flex-1">
