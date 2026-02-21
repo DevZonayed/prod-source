@@ -55,7 +55,7 @@ export const createVmForRepo = async (
     recreate: true,
     workdir: WORKDIR,
     persistence: {
-      type: "persistent",
+      type: "sticky",
     },
     git: {
       repos: [

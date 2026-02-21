@@ -69,6 +69,7 @@ export async function POST(req: Request) {
   return llm.result.toUIMessageStreamResponse({
     sendReasoning: true,
     originalMessages: messages,
+    generateMessageId: () => crypto.randomUUID(),
     onFinish: async ({ messages: finalMessages }) => {
       const latestMetadata = await readRepoMetadata(repoId);
       if (!latestMetadata) return;

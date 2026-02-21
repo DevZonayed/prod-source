@@ -27,7 +27,6 @@ export function HomeWorkspace() {
       sidebarVisible={sidebarVisible}
     >
       <Assistant
-        initialMessages={[]}
         selectedRepoId={activeRepoId}
         selectedConversationId={activeConversationId}
         onActiveConversationChange={handleActiveConversationChange}

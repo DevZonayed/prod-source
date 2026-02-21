@@ -8,7 +8,7 @@ import {
 import { useChat } from "@ai-sdk/react";
 import { type UIMessage } from "ai";
 import { Thread } from "@/components/assistant-ui/thread";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type ThreadState = {
   isEmpty: boolean;
@@ -39,27 +39,52 @@ export const Assistant = ({
   const [localConversationId, setLocalConversationId] = useState<string | null>(
     selectedConversationId,
   );
+  const activeRepoIdRef = useRef<string | null>(selectedRepoId);
+  const activeConversationIdRef = useRef<string | null>(selectedConversationId);
+  const onActiveConversationChangeRef = useRef(onActiveConversationChange);
+  const chatSessionIdRef = useRef(
+    selectedConversationId
+      ? `conversation:${selectedConversationId}`
+      : selectedRepoId
+        ? `repo:${selectedRepoId}:draft`
+        : "home:draft",
+  );
 
   useEffect(() => {
     setSeedMessages(resolvedInitialMessages);
   }, [resolvedInitialMessages]);
 
   useEffect(() => {
-    setLocalRepoId(selectedRepoId);
-    setLocalConversationId(selectedConversationId);
+    setLocalRepoId((previous) => selectedRepoId ?? previous);
+    setLocalConversationId((previous) => selectedConversationId ?? previous);
   }, [selectedConversationId, selectedRepoId]);
 
+  useEffect(() => {
+    if (selectedRepoId) {
+      activeRepoIdRef.current = selectedRepoId;
+    }
+    if (selectedConversationId) {
+      activeConversationIdRef.current = selectedConversationId;
+    }
+  }, [selectedConversationId, selectedRepoId]);
+
+  useEffect(() => {
+    onActiveConversationChangeRef.current = onActiveConversationChange;
+  }, [onActiveConversationChange]);
+
   const ensureActiveConversation = useCallback(async () => {
-    if (localRepoId && localConversationId) {
-      onActiveConversationChange?.(localRepoId, localConversationId);
+    const activeRepoId = activeRepoIdRef.current;
+    const activeConversationId = activeConversationIdRef.current;
+
+    if (activeRepoId && activeConversationId) {
       return {
-        repoId: localRepoId,
-        conversationId: localConversationId,
+        repoId: activeRepoId,
+        conversationId: activeConversationId,
       };
     }
 
-    if (localRepoId) {
-      const response = await fetch(`/api/repos/${localRepoId}/conversations`, {
+    if (activeRepoId) {
+      const response = await fetch(`/api/repos/${activeRepoId}/conversations`, {
         method: "POST",
       });
 
@@ -76,13 +101,14 @@ export const Assistant = ({
         throw new Error("Conversation creation did not return an id.");
       }
 
-      const nextPath = `/${localRepoId}/${conversationId}`;
+      const nextPath = `/${activeRepoId}/${conversationId}`;
       window.history.replaceState(window.history.state, "", nextPath);
       setLocalConversationId(conversationId);
-      onActiveConversationChange?.(localRepoId, conversationId);
+      activeConversationIdRef.current = conversationId;
+      onActiveConversationChangeRef.current?.(activeRepoId, conversationId);
 
       return {
-        repoId: localRepoId,
+        repoId: activeRepoId,
         conversationId,
       };
     }
@@ -104,15 +130,17 @@ export const Assistant = ({
     window.history.replaceState(window.history.state, "", nextPath);
     setLocalRepoId(repoId);
     setLocalConversationId(conversationId);
-    onActiveConversationChange?.(repoId, conversationId);
+    activeRepoIdRef.current = repoId;
+    activeConversationIdRef.current = conversationId;
+    onActiveConversationChangeRef.current?.(repoId, conversationId);
 
     return {
       repoId,
       conversationId,
     };
-  }, [localConversationId, localRepoId, onActiveConversationChange]);
+  }, []);
 
-  const runtimeKey = "assistant-runtime";
+  const runtimeKey = chatSessionIdRef.current;
 
   const chat = useChat<UIMessage>({
     id: runtimeKey,
@@ -124,11 +152,11 @@ export const Assistant = ({
         return {
           body: {
             ...options.body,
-            id: options.id,
             messages: options.messages,
-            trigger: options.trigger,
-            messageId: options.messageId,
             metadata: options.requestMetadata,
+            id: undefined,
+            trigger: "submit-message",
+            messageId: undefined,
             repoId: active.repoId,
             conversationId: active.conversationId,
           },
