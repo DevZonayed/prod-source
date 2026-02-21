@@ -3,7 +3,7 @@ import { Sidebar, useSidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { ListTreeIcon, PlusIcon, RocketIcon } from "lucide-react";
 
-type DeploymentTimelineEntry = {
+export type RepoDeployment = {
   commitSha: string;
   commitMessage: string;
   commitDate: string;
@@ -32,6 +32,7 @@ export type RepoItem = {
   name: string;
   vm: RepoVmInfo | null;
   conversations: RepoConversation[];
+  deployments: RepoDeployment[];
 };
 
 const AdorableLogo = () => (
@@ -235,7 +236,12 @@ export function RepoSidebar({
                   )}
                 </div>
               ) : (
-                <DeploymentTimelineList repoId={selectedRepoId ?? undefined} />
+                <DeploymentTimelineList
+                  items={
+                    repos.find((repo) => repo.id === selectedRepoId)
+                      ?.deployments ?? []
+                  }
+                />
               )}
             </div>
           </div>
@@ -245,42 +251,11 @@ export function RepoSidebar({
   );
 }
 
-function DeploymentTimelineList({ repoId }: { repoId?: string }) {
-  const [items, setItems] = React.useState<DeploymentTimelineEntry[]>([]);
-
-  React.useEffect(() => {
-    if (!repoId) {
-      setItems([]);
-      return;
-    }
-
-    let cancelled = false;
-
-    const poll = async () => {
-      try {
-        const params = new URLSearchParams({ repoId, limit: "10" });
-        const response = await fetch(
-          `/api/deployment-timeline?${params.toString()}`,
-        );
-        if (!response.ok) return;
-        const data = await response.json();
-        if (cancelled) return;
-        setItems(Array.isArray(data.timeline) ? data.timeline : []);
-      } catch {}
-    };
-
-    poll();
-    const interval = window.setInterval(poll, 5000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [repoId]);
-
-  if (!repoId) {
+function DeploymentTimelineList({ items }: { items: RepoDeployment[] }) {
+  if (!items.length) {
     return (
       <div className="px-2 py-3 text-xs text-muted-foreground">
-        Select a project first.
+        No deployments yet.
       </div>
     );
   }
@@ -289,7 +264,7 @@ function DeploymentTimelineList({ repoId }: { repoId?: string }) {
     <div className="h-full space-y-3 overflow-x-hidden overflow-y-auto px-1 pb-2">
       {items.map((entry) => (
         <div
-          key={entry.commitSha}
+          key={`${entry.commitSha}-${entry.url}`}
           className="space-y-1.5 rounded-md border p-2"
         >
           <a
@@ -324,11 +299,6 @@ function DeploymentTimelineList({ repoId }: { repoId?: string }) {
           </a>
         </div>
       ))}
-      {items.length === 0 && (
-        <div className="px-2 py-3 text-xs text-muted-foreground">
-          No deployments yet.
-        </div>
-      )}
     </div>
   );
 }

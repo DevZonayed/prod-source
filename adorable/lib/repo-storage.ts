@@ -18,10 +18,21 @@ export type RepoConversationSummary = {
   updatedAt: string;
 };
 
+export type RepoDeploymentSummary = {
+  commitSha: string;
+  commitMessage: string;
+  commitDate: string;
+  domain: string;
+  url: string;
+  deploymentId: string | null;
+  state: "idle" | "deploying" | "live" | "failed";
+};
+
 export type RepoMetadata = {
   version: 1;
   vm: RepoVmMetadata;
   conversations: RepoConversationSummary[];
+  deployments: RepoDeploymentSummary[];
 };
 
 const decodeBase64 = (value: string) => {
@@ -96,7 +107,18 @@ const deriveConversationTitle = (
 export const readRepoMetadata = async (
   repoId: string,
 ): Promise<RepoMetadata | null> => {
-  return readJsonFile<RepoMetadata>(repoId, ADORABLE_METADATA_PATH);
+  const metadata = await readJsonFile<RepoMetadata>(
+    repoId,
+    ADORABLE_METADATA_PATH,
+  );
+  if (!metadata) return null;
+
+  return {
+    ...metadata,
+    deployments: Array.isArray(metadata.deployments)
+      ? metadata.deployments
+      : [],
+  };
 };
 
 export const writeRepoMetadata = async (
@@ -193,6 +215,31 @@ export const saveConversationMessages = async (
     {
       path: conversationPath(conversationId),
       content: encodeJson(messages),
+    },
+  ]);
+
+  return nextMetadata;
+};
+
+export const addRepoDeployment = async (
+  repoId: string,
+  metadata: RepoMetadata,
+  deployment: RepoDeploymentSummary,
+) => {
+  const nextMetadata: RepoMetadata = {
+    ...metadata,
+    deployments: [
+      deployment,
+      ...metadata.deployments.filter(
+        (d) => d.commitSha !== deployment.commitSha,
+      ),
+    ],
+  };
+
+  await writeCommit(repoId, "Record deployment", [
+    {
+      path: ADORABLE_METADATA_PATH,
+      content: encodeJson(nextMetadata),
     },
   ]);
 

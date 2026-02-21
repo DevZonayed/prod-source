@@ -60,6 +60,7 @@ export async function POST() {
     version: 1,
     vm,
     conversations: [],
+    deployments: [],
   };
 
   await writeRepoMetadata(repoId, initialMetadata);

@@ -2,6 +2,7 @@ import { tool } from "ai";
 import { freestyle, Vm } from "freestyle-sandboxes";
 import { z } from "zod";
 import { getDomainForCommit, getLatestCommitSha } from "./deployment-status";
+import { addRepoDeployment, readRepoMetadata } from "./repo-storage";
 import { WORKDIR, VM_PORT } from "./vars";
 
 type CreateToolsOptions = {
@@ -332,10 +333,28 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
           if (!commitSha) return;
 
           const deploymentDomain = getDomainForCommit(commitSha);
-          await freestyle.serverless.deployments.create({
+          const deployment = await freestyle.serverless.deployments.create({
             repo: options.repoId!,
             domains: [deploymentDomain],
             build: true,
+          });
+
+          const metadata = await readRepoMetadata(options.repoId!);
+          if (!metadata) return;
+
+          const deploymentId =
+            deployment && typeof deployment === "object" && "id" in deployment
+              ? String((deployment as Record<string, unknown>).id ?? "") || null
+              : null;
+
+          await addRepoDeployment(options.repoId!, metadata, {
+            commitSha,
+            commitMessage: message,
+            commitDate: new Date().toISOString(),
+            domain: deploymentDomain,
+            url: `https://${deploymentDomain}`,
+            deploymentId,
+            state: "deploying",
           });
         })().catch((error) => {
           console.error("Post-commit deploy failed:", error);

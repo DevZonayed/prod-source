@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   RepoSidebar,
+  type RepoDeployment,
   type RepoItem,
   type RepoVmInfo,
 } from "@/components/assistant-ui/repo-sidebar";
@@ -63,6 +64,7 @@ export function RepoWorkspaceShell({
             metadata?: {
               vm?: RepoVmInfo;
               conversations?: RepoItem["conversations"];
+              deployments?: RepoDeployment[];
             };
           }) => ({
             id: repo.id,
@@ -70,6 +72,9 @@ export function RepoWorkspaceShell({
             vm: repo.metadata?.vm ?? null,
             conversations: Array.isArray(repo.metadata?.conversations)
               ? repo.metadata.conversations
+              : [],
+            deployments: Array.isArray(repo.metadata?.deployments)
+              ? repo.metadata.deployments
               : [],
           }),
         )
