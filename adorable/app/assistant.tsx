@@ -2,9 +2,10 @@
 
 import { AssistantRuntimeProvider, useAuiState } from "@assistant-ui/react";
 import {
-  useChatRuntime,
+  useAISDKRuntime,
   AssistantChatTransport,
 } from "@assistant-ui/react-ai-sdk";
+import { useChat } from "@ai-sdk/react";
 import { type UIMessage } from "ai";
 import { Thread } from "@/components/assistant-ui/thread";
 import {
@@ -227,7 +228,7 @@ export const Assistant = () => {
     };
   }, [loadRepos, repos, selectedConversationId, selectedRepoId]);
 
-  const runtime = useChatRuntime({
+  const chat = useChat<UIMessage>({
     id: `${selectedRepoId ?? "none"}:${selectedConversationId ?? "none"}:${conversationSeedNonce}`,
     transport: new AssistantChatTransport({
       api: "/api/chat", // API route
@@ -250,6 +251,8 @@ export const Assistant = () => {
     }),
     messages: seedMessages,
   });
+
+  const runtime = useAISDKRuntime(chat);
 
   const runtimeKey = `${selectedRepoId ?? "none"}:${selectedConversationId ?? "none"}:${conversationSeedNonce}`;
 

@@ -1,4 +1,4 @@
-This is an [assistant-ui](https://github.com/Yonom/assistant-ui) project with provider-agnostic backend routing and OpenAI Conversations API persistence.
+This is an [assistant-ui](https://github.com/Yonom/assistant-ui) project with provider-agnostic backend routing and repo-backed conversation persistence.
 
 ## Getting Started
 
@@ -7,7 +7,7 @@ This is an [assistant-ui](https://github.com/Yonom/assistant-ui) project with pr
 Create a `.env.local` file in the root directory and add your credentials:
 
 ```
-# Default provider: OpenAI (persistent conversation state via Conversations API)
+# Default provider: OpenAI
 LLM_PROVIDER=openai
 OPENAI_API_KEY=your-openai-api-key
 
@@ -52,6 +52,6 @@ You can start customizing the UI by modifying components in the `components/assi
 
 - `app/assistant.tsx` - Renders the chat interface and sets up the assistant runtime
 - `app/api/chat/route.ts` - Chat API endpoint
-- `lib/llm-provider.ts` - Provider wrapper (OpenAI + Claude) with OpenAI conversation persistence
+- `lib/llm-provider.ts` - Provider wrapper (OpenAI + Claude)
 - `components/assistant-ui/thread.tsx` - Chat thread component
 - `components/app-sidebar.tsx` - Sidebar with thread list
