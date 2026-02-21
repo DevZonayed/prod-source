@@ -28,7 +28,6 @@ import {
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { pickRandom } from "@/lib/suggestions";
 import {
   ActionBarMorePrimitive,
   ActionBarPrimitive,
@@ -52,7 +51,7 @@ import {
   RefreshCwIcon,
   SquareIcon,
 } from "lucide-react";
-import { type FC, useEffect, useState } from "react";
+import { type FC } from "react";
 
 export const Thread: FC = () => {
   return (
@@ -129,50 +128,13 @@ const ThreadWelcome: FC = () => {
             />
           </svg>
           <h1 className="aui-thread-welcome-message-inner animate-in text-3xl font-semibold tracking-tight duration-300 fade-in slide-in-from-bottom-2">
-            What do you want to build?
+            Continue building this project
           </h1>
           <p className="aui-thread-welcome-message-inner mt-2 animate-in text-base text-muted-foreground delay-75 duration-300 fade-in slide-in-from-bottom-2">
-            Describe an app and Adorable will build it for you.
+            Ask for edits, new features, fixes, or deployments.
           </p>
         </div>
       </div>
-      <ThreadSuggestions />
-    </div>
-  );
-};
-
-const ThreadSuggestions: FC = () => {
-  const [picks, setPicks] = useState<ReturnType<typeof pickRandom>>([]);
-  useEffect(() => {
-    setPicks(pickRandom(4));
-  }, []);
-
-  if (picks.length === 0) return null;
-
-  return (
-    <div className="aui-thread-welcome-suggestions grid w-full grid-cols-2 gap-2 pb-4">
-      {picks.map((suggestion, index) => (
-        <div
-          key={suggestion.prompt}
-          className="aui-thread-welcome-suggestion-display animate-in duration-300 fill-mode-both fade-in slide-in-from-bottom-2"
-          style={{ animationDelay: `${150 + index * 75}ms` }}
-        >
-          <ThreadPrimitive.Suggestion prompt={suggestion.prompt} send asChild>
-            <Button
-              variant="ghost"
-              className="aui-thread-welcome-suggestion h-auto w-full flex-col items-start justify-start gap-0.5 rounded-xl border px-4 py-3 text-left text-sm transition-colors hover:bg-muted"
-              aria-label={suggestion.prompt}
-            >
-              <span className="aui-thread-welcome-suggestion-text-1 font-medium">
-                {suggestion.title}
-              </span>
-              <span className="aui-thread-welcome-suggestion-text-2 text-muted-foreground">
-                {suggestion.label}
-              </span>
-            </Button>
-          </ThreadPrimitive.Suggestion>
-        </div>
-      ))}
     </div>
   );
 };

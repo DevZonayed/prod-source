@@ -7,6 +7,7 @@ import {
 } from "@assistant-ui/react-ai-sdk";
 import { useChat } from "@ai-sdk/react";
 import { type UIMessage } from "ai";
+import { usePathname, useRouter } from "next/navigation";
 import { Thread } from "@/components/assistant-ui/thread";
 import {
   RepoSidebar,
@@ -45,14 +46,43 @@ type DeploymentStatus = {
   commitSha: string | null;
 };
 
-export const Assistant = () => {
+export const Assistant = ({
+  initialMessages = [],
+}: {
+  initialMessages?: UIMessage[];
+}) => {
+  const router = useRouter();
+  const pathname = usePathname();
+  const pathParts = pathname.split("/").filter(Boolean);
+  const routeRepoId = pathParts[0] ?? null;
+  const routeConversationId = pathParts[1] ?? null;
+
+  const [localRoute, setLocalRoute] = useState<{
+    repoId: string;
+    conversationId: string | null;
+  } | null>(null);
+
+  const selectedRepoId = localRoute?.repoId ?? routeRepoId;
+  const selectedConversationId =
+    localRoute?.conversationId ?? routeConversationId;
+
   const [repos, setRepos] = useState<RepoItem[]>([]);
-  const [selectedRepoId, setSelectedRepoId] = useState<string | null>(null);
-  const [selectedConversationId, setSelectedConversationId] = useState<
-    string | null
-  >(null);
-  const [seedMessages, setSeedMessages] = useState<UIMessage[]>([]);
-  const [conversationSeedNonce, setConversationSeedNonce] = useState(0);
+  const [seedMessages, setSeedMessages] =
+    useState<UIMessage[]>(initialMessages);
+
+  useEffect(() => {
+    if (!localRoute) return;
+    if (
+      routeRepoId === localRoute.repoId &&
+      routeConversationId === localRoute.conversationId
+    ) {
+      setLocalRoute(null);
+    }
+  }, [localRoute, routeConversationId, routeRepoId]);
+
+  useEffect(() => {
+    setSeedMessages(initialMessages);
+  }, [initialMessages]);
 
   const selectedRepo = repos.find((repo) => repo.id === selectedRepoId) ?? null;
 
@@ -84,49 +114,19 @@ export const Assistant = () => {
     setRepos(nextRepos);
 
     if (!selectedRepoId && nextRepos[0]?.id) {
-      setSelectedRepoId(nextRepos[0].id);
-      setSelectedConversationId(nextRepos[0].conversations[0]?.id ?? null);
+      const repoId = nextRepos[0].id;
+      const conversationId = nextRepos[0].conversations[0]?.id;
+      if (conversationId) {
+        router.replace(`/${repoId}/${conversationId}`);
+      } else {
+        router.replace(`/${repoId}`);
+      }
     }
-  }, [selectedRepoId]);
+  }, [router, selectedRepoId]);
 
   useEffect(() => {
     loadRepos();
   }, [loadRepos]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadConversationMessages = async () => {
-      if (!selectedRepoId || !selectedConversationId) {
-        setSeedMessages([]);
-        setConversationSeedNonce((value) => value + 1);
-        return;
-      }
-
-      setSeedMessages([]);
-
-      const response = await fetch(
-        `/api/repos/${selectedRepoId}/conversations/${selectedConversationId}`,
-      );
-      if (!response.ok) {
-        if (cancelled) return;
-        setSeedMessages([]);
-        setConversationSeedNonce((value) => value + 1);
-        return;
-      }
-
-      const data = await response.json();
-      if (cancelled) return;
-      setSeedMessages(Array.isArray(data.messages) ? data.messages : []);
-      setConversationSeedNonce((value) => value + 1);
-    };
-
-    loadConversationMessages();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedRepoId, selectedConversationId]);
 
   const handleCreateRepo = useCallback(async () => {
     const response = await fetch("/api/repos", { method: "POST" });
@@ -135,25 +135,15 @@ export const Assistant = () => {
     await loadRepos();
 
     if (data.id && data.conversationId) {
-      setSelectedRepoId(data.id);
-      setSelectedConversationId(data.conversationId);
+      router.push(`/${data.id}/${data.conversationId}`);
     }
-  }, [loadRepos]);
+  }, [loadRepos, router]);
 
   const handleCreateConversation = useCallback(
     async (repoId: string) => {
-      const response = await fetch(`/api/repos/${repoId}/conversations`, {
-        method: "POST",
-      });
-      if (!response.ok) return;
-      const data = await response.json();
-      await loadRepos();
-      if (data.conversationId) {
-        setSelectedRepoId(repoId);
-        setSelectedConversationId(data.conversationId);
-      }
+      router.push(`/${repoId}`);
     },
-    [loadRepos],
+    [router],
   );
 
   const ensureActiveConversation = useCallback(async () => {
@@ -165,14 +155,10 @@ export const Assistant = () => {
     }
 
     if (selectedRepoId) {
-      const selectedRepo = repos.find((repo) => repo.id === selectedRepoId);
-      const existingConversationId = selectedRepo?.conversations[0]?.id;
-
-      if (existingConversationId) {
-        setSelectedConversationId(existingConversationId);
+      if (selectedConversationId) {
         return {
           repoId: selectedRepoId,
-          conversationId: existingConversationId,
+          conversationId: selectedConversationId,
         };
       }
 
@@ -196,7 +182,9 @@ export const Assistant = () => {
         throw new Error("Conversation creation did not return an id.");
       }
 
-      setSelectedConversationId(conversationId);
+      const nextPath = `/${selectedRepoId}/${conversationId}`;
+      window.history.replaceState(window.history.state, "", nextPath);
+      setLocalRoute({ repoId: selectedRepoId, conversationId });
       await loadRepos();
 
       return {
@@ -218,18 +206,73 @@ export const Assistant = () => {
       throw new Error("Repository creation did not return ids.");
     }
 
-    setSelectedRepoId(repoId);
-    setSelectedConversationId(conversationId);
+    const nextPath = `/${repoId}/${conversationId}`;
+    window.history.replaceState(window.history.state, "", nextPath);
+    setLocalRoute({ repoId, conversationId });
     await loadRepos();
 
     return {
       repoId,
       conversationId,
     };
-  }, [loadRepos, repos, selectedConversationId, selectedRepoId]);
+  }, [loadRepos, router, selectedConversationId, selectedRepoId]);
+
+  const runtimeKey = selectedRepoId ?? "none";
+
+  return (
+    <ConversationRuntimeShell
+      runtimeKey={runtimeKey}
+      seedMessages={seedMessages}
+      ensureActiveConversation={ensureActiveConversation}
+      repos={repos}
+      selectedRepoId={selectedRepoId}
+      selectedConversationId={selectedConversationId}
+      onSelectConversation={(repoId, conversationId) => {
+        router.push(`/${repoId}/${conversationId}`);
+      }}
+      onCreateRepo={handleCreateRepo}
+      onCreateConversation={handleCreateConversation}
+      repoVm={selectedRepo?.vm ?? null}
+      isConversationLoading={false}
+    />
+  );
+};
+
+function ConversationRuntimeShell({
+  runtimeKey,
+  seedMessages,
+  ensureActiveConversation,
+  repos,
+  selectedRepoId,
+  selectedConversationId,
+  onSelectConversation,
+  onCreateRepo,
+  onCreateConversation,
+  repoVm,
+  isConversationLoading,
+}: {
+  runtimeKey: string;
+  seedMessages: UIMessage[];
+  ensureActiveConversation: () => Promise<{
+    repoId: string;
+    conversationId: string;
+  }>;
+  repos: RepoItem[];
+  selectedRepoId: string | null;
+  selectedConversationId: string | null;
+  onSelectConversation: (repoId: string, conversationId: string) => void;
+  onCreateRepo: () => Promise<void>;
+  onCreateConversation: (repoId: string) => Promise<void>;
+  repoVm: RepoVmInfo | null;
+  isConversationLoading: boolean;
+}) {
+  const [threadState, setThreadState] = useState({
+    isEmpty: true,
+    isRunning: false,
+  });
 
   const chat = useChat<UIMessage>({
-    id: `${selectedRepoId ?? "none"}:${selectedConversationId ?? "none"}:${conversationSeedNonce}`,
+    id: runtimeKey,
     transport: new AssistantChatTransport({
       api: "/api/chat", // API route
       prepareSendMessagesRequest: async (options) => {
@@ -254,76 +297,94 @@ export const Assistant = () => {
 
   const runtime = useAISDKRuntime(chat);
 
-  const runtimeKey = `${selectedRepoId ?? "none"}:${selectedConversationId ?? "none"}:${conversationSeedNonce}`;
-
   return (
-    <AssistantRuntimeProvider key={runtimeKey} runtime={runtime}>
-      <SidebarProvider>
-        <div className="flex h-dvh w-full pr-0.5">
-          <RepoSidebar
-            repos={repos}
+    <SidebarProvider>
+      <div className="flex h-dvh w-full pr-0.5">
+        <RepoSidebar
+          repos={repos}
+          selectedRepoId={selectedRepoId}
+          selectedConversationId={selectedConversationId}
+          onSelectConversation={onSelectConversation}
+          onCreateRepo={onCreateRepo}
+          onCreateConversation={onCreateConversation}
+        />
+        <SidebarInset>
+          <MainContent
+            runtime={runtime}
+            runtimeKey={runtimeKey}
             selectedRepoId={selectedRepoId}
-            selectedConversationId={selectedConversationId}
-            onSelectConversation={(repoId, conversationId) => {
-              setSelectedRepoId(repoId);
-              setSelectedConversationId(conversationId);
-            }}
-            onCreateRepo={handleCreateRepo}
-            onCreateConversation={handleCreateConversation}
+            repoVm={repoVm}
+            threadIsEmpty={threadState.isEmpty}
+            threadIsRunning={threadState.isRunning}
+            onThreadStateChange={setThreadState}
+            isConversationLoading={isConversationLoading}
           />
-          <SidebarInset>
-            <MainContent
-              selectedRepoId={selectedRepoId}
-              repoVm={selectedRepo?.vm ?? null}
-            />
-          </SidebarInset>
-        </div>
-      </SidebarProvider>
-    </AssistantRuntimeProvider>
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
   );
-};
+}
 
 function MainContent({
+  runtime,
+  runtimeKey,
   selectedRepoId,
   repoVm,
+  threadIsEmpty,
+  threadIsRunning,
+  onThreadStateChange,
+  isConversationLoading,
 }: {
+  runtime: ReturnType<typeof useAISDKRuntime>;
+  runtimeKey: string;
   selectedRepoId: string | null;
   repoVm: RepoVmInfo | null;
+  threadIsEmpty: boolean;
+  threadIsRunning: boolean;
+  onThreadStateChange: React.Dispatch<
+    React.SetStateAction<{ isEmpty: boolean; isRunning: boolean }>
+  >;
+  isConversationLoading: boolean;
 }) {
-  const isEmpty = useAuiState(({ thread }) => thread.isEmpty);
   const hasPreview = Boolean(repoVm?.previewUrl);
-  const { setOpen, isMobile } = useSidebar();
-  const wasEmptyRef = useRef(isEmpty);
-
-  useEffect(() => {
-    if (wasEmptyRef.current && !isEmpty && !isMobile) {
-      setOpen(false);
-    }
-    wasEmptyRef.current = isEmpty;
-  }, [isEmpty, isMobile, setOpen]);
+  const showPreview = hasPreview && Boolean(selectedRepoId);
+  useSidebar();
 
   return (
     <div
       className="grid h-dvh transition-[grid-template-columns] duration-500 ease-in-out"
       style={{
-        gridTemplateColumns: !isEmpty ? "1fr 1fr" : "1fr 0fr",
+        gridTemplateColumns: showPreview ? "1fr 1fr" : "1fr 0fr",
       }}
     >
       <div className="relative min-w-0 overflow-hidden">
-        <SidebarTrigger className="absolute top-2.5 left-2.5 z-10" />
-        <Thread />
+        <AssistantRuntimeProvider key={runtimeKey} runtime={runtime}>
+          <ThreadStateBridge onThreadStateChange={onThreadStateChange} />
+          <SidebarTrigger className="absolute top-2.5 left-2.5 z-10" />
+          {isConversationLoading ? (
+            <div className="flex h-full w-full items-center justify-center">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2Icon className="size-4 animate-spin" />
+                Loading conversation…
+              </div>
+            </div>
+          ) : (
+            <Thread />
+          )}
+        </AssistantRuntimeProvider>
       </div>
       <div
         className={cn(
           "min-w-0 overflow-hidden border-l transition-opacity duration-500",
-          !isEmpty ? "opacity-100" : "pointer-events-none opacity-0",
+          showPreview ? "opacity-100" : "pointer-events-none opacity-0",
         )}
       >
-        {!isEmpty &&
+        {showPreview &&
           (repoVm?.previewUrl ? (
             <AppPreview
               repoId={selectedRepoId ?? undefined}
               metadata={repoVm}
+              isAgentRunning={threadIsRunning}
             />
           ) : (
             <PreviewPlaceholder />
@@ -331,6 +392,23 @@ function MainContent({
       </div>
     </div>
   );
+}
+
+function ThreadStateBridge({
+  onThreadStateChange,
+}: {
+  onThreadStateChange: React.Dispatch<
+    React.SetStateAction<{ isEmpty: boolean; isRunning: boolean }>
+  >;
+}) {
+  const isEmpty = useAuiState(({ thread }) => thread.isEmpty);
+  const isRunning = useAuiState(({ thread }) => thread.isRunning);
+
+  useEffect(() => {
+    onThreadStateChange({ isEmpty, isRunning });
+  }, [isEmpty, isRunning, onThreadStateChange]);
+
+  return null;
 }
 
 function DeploymentStatusBadge({
@@ -491,12 +569,12 @@ type TerminalTab = {
 function AppPreview({
   metadata,
   repoId,
+  isAgentRunning,
 }: {
   metadata: RepoVmInfo;
   repoId?: string;
+  isAgentRunning: boolean;
 }) {
-  const isAgentRunning = useAuiState(({ thread }) => thread.isRunning);
-
   const [extraTerminals, setExtraTerminals] = useState<TerminalTab[]>([]);
   const [activeTab, setActiveTab] = useState("dev-server");
   const [counter, setCounter] = useState(1);
