@@ -52,6 +52,7 @@ import {
   SquareIcon,
 } from "lucide-react";
 import { type FC } from "react";
+import { usePathname } from "next/navigation";
 
 export const Thread: FC = () => {
   return (
@@ -98,6 +99,9 @@ const ThreadScrollToBottom: FC = () => {
 };
 
 const ThreadWelcome: FC = () => {
+  const pathname = usePathname();
+  const isHome = pathname === "/";
+
   return (
     <div className="aui-thread-welcome-root mx-auto my-auto flex w-full max-w-(--thread-max-width) grow flex-col">
       <div className="aui-thread-welcome-center flex w-full grow flex-col items-center justify-center">
@@ -128,10 +132,14 @@ const ThreadWelcome: FC = () => {
             />
           </svg>
           <h1 className="aui-thread-welcome-message-inner animate-in text-3xl font-semibold tracking-tight duration-300 fade-in slide-in-from-bottom-2">
-            Continue building this project
+            {isHome
+              ? "What do you want to build?"
+              : "Continue building this project"}
           </h1>
           <p className="aui-thread-welcome-message-inner mt-2 animate-in text-base text-muted-foreground delay-75 duration-300 fade-in slide-in-from-bottom-2">
-            Ask for edits, new features, fixes, or deployments.
+            {isHome
+              ? "Start a new project or ask for anything to get going."
+              : "Ask for edits, new features, fixes, or deployments."}
           </p>
         </div>
       </div>

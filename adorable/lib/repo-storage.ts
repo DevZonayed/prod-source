@@ -30,6 +30,7 @@ export type RepoDeploymentSummary = {
 
 export type RepoMetadata = {
   version: 1;
+  name?: string;
   vm: RepoVmMetadata;
   conversations: RepoConversationSummary[];
   deployments: RepoDeploymentSummary[];
@@ -134,10 +135,15 @@ export const createConversationInRepo = async (
   repoId: string,
   metadata: RepoMetadata,
   conversationId: string,
+  initialTitle?: string,
 ) => {
   const latestMetadata = (await readRepoMetadata(repoId)) ?? metadata;
   const now = new Date().toISOString();
-  const fallbackTitle = `Conversation ${latestMetadata.conversations.length + 1}`;
+  const normalizedInitialTitle = initialTitle?.trim().replace(/\s+/g, " ");
+  const fallbackTitle =
+    normalizedInitialTitle && normalizedInitialTitle.length > 0
+      ? normalizedInitialTitle.slice(0, 60)
+      : `Conversation ${latestMetadata.conversations.length + 1}`;
 
   const nextMetadata: RepoMetadata = {
     ...latestMetadata,

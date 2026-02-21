@@ -11,11 +11,22 @@ import {
   writeRepoMetadata,
 } from "@/lib/repo-storage";
 
+const ADORABLE_REPO_PREFIX = "adorable - ";
+
+const toDisplayRepoName = (name?: string | null) => {
+  if (!name) return undefined;
+  return name.startsWith(ADORABLE_REPO_PREFIX)
+    ? name.slice(ADORABLE_REPO_PREFIX.length)
+    : name;
+};
+
 const toRepoResponse = async (repo: { id: string; name?: string | null }) => {
   const metadata = await readRepoMetadata(repo.id);
+  const repoDisplayName = toDisplayRepoName(repo.name);
+  const metadataDisplayName = toDisplayRepoName(metadata?.name);
   return {
     id: repo.id,
-    name: repo.name ?? "Untitled Repo",
+    name: repoDisplayName ?? metadataDisplayName ?? "Untitled Repo",
     metadata,
   };
 };
@@ -34,10 +45,31 @@ export async function GET() {
   });
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   const { identity } = await getOrCreateIdentitySession();
 
+  let requestedName: string | undefined;
+  let requestedConversationTitle: string | undefined;
+  try {
+    const payload = (await req.json()) as {
+      name?: string;
+      conversationTitle?: string;
+    };
+    const nextName = payload?.name?.trim();
+    const nextConversationTitle = payload?.conversationTitle?.trim();
+    requestedName = nextName ? nextName : undefined;
+    requestedConversationTitle = nextConversationTitle
+      ? nextConversationTitle
+      : undefined;
+  } catch {
+    requestedName = undefined;
+    requestedConversationTitle = undefined;
+  }
+
   const { repoId } = await freestyle.git.repos.create({
+    ...(requestedName
+      ? { name: `${ADORABLE_REPO_PREFIX}${requestedName}` }
+      : {}),
     import: {
       commitMessage: "Initial commit",
       url: TEMPLATE_REPO,
@@ -70,6 +102,7 @@ export async function POST() {
     repoId,
     initialMetadata,
     conversationId,
+    requestedConversationTitle,
   );
 
   return NextResponse.json({

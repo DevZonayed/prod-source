@@ -17,6 +17,17 @@ type ThreadState = {
 
 const EMPTY_MESSAGES: UIMessage[] = [];
 
+const extractUserPrompt = (messages: UIMessage[]): string | null => {
+  const firstUserMessage = messages.find((message) => message.role === "user");
+  if (!firstUserMessage) return null;
+
+  const textPart = firstUserMessage.parts?.find((part) => part.type === "text");
+  if (!textPart || !("text" in textPart)) return null;
+
+  const clean = textPart.text.trim().replace(/\s+/g, " ");
+  return clean || null;
+};
+
 export const Assistant = ({
   initialMessages,
   selectedRepoId = null,
@@ -90,92 +101,155 @@ export const Assistant = ({
     };
   }, []);
 
-  const ensureActiveConversation = useCallback(async () => {
-    const activeRepoId = activeRepoIdRef.current;
-    const activeConversationId = activeConversationIdRef.current;
+  const ensureActiveConversation = useCallback(
+    async (requestedRepoName?: string, requestedConversationTitle?: string) => {
+      const activeRepoId = activeRepoIdRef.current;
+      const activeConversationId = activeConversationIdRef.current;
 
-    if (activeRepoId && activeConversationId) {
-      return {
-        repoId: activeRepoId,
-        conversationId: activeConversationId,
-      };
-    }
+      if (activeRepoId && activeConversationId) {
+        return {
+          repoId: activeRepoId,
+          conversationId: activeConversationId,
+        };
+      }
 
-    if (activeRepoId) {
-      const response = await fetch(`/api/repos/${activeRepoId}/conversations`, {
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          "Failed to create a conversation for the selected repo.",
+      if (activeRepoId) {
+        const response = await fetch(
+          `/api/repos/${activeRepoId}/conversations`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(
+              requestedConversationTitle
+                ? { title: requestedConversationTitle }
+                : {},
+            ),
+          },
         );
+
+        if (!response.ok) {
+          throw new Error(
+            "Failed to create a conversation for the selected repo.",
+          );
+        }
+
+        const data = await response.json();
+        const conversationId = data.conversationId as string | undefined;
+
+        if (!conversationId) {
+          throw new Error("Conversation creation did not return an id.");
+        }
+
+        const nextPath = `/${activeRepoId}/${conversationId}`;
+        window.history.replaceState(window.history.state, "", nextPath);
+        setLocalConversationId(conversationId);
+        activeConversationIdRef.current = conversationId;
+        onActiveConversationChangeRef.current?.(activeRepoId, conversationId);
+        window.dispatchEvent(
+          new CustomEvent("adorable:active-conversation", {
+            detail: { repoId: activeRepoId, conversationId },
+          }),
+        );
+
+        return {
+          repoId: activeRepoId,
+          conversationId,
+        };
+      }
+
+      const response = await fetch("/api/repos", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(
+          requestedRepoName || requestedConversationTitle
+            ? {
+                ...(requestedRepoName ? { name: requestedRepoName } : {}),
+                ...(requestedConversationTitle
+                  ? { conversationTitle: requestedConversationTitle }
+                  : {}),
+              }
+            : {},
+        ),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to create a repository for this chat.");
       }
 
       const data = await response.json();
+      const repoId = data.id as string | undefined;
       const conversationId = data.conversationId as string | undefined;
 
-      if (!conversationId) {
-        throw new Error("Conversation creation did not return an id.");
+      if (!repoId || !conversationId) {
+        throw new Error("Repository creation did not return ids.");
       }
 
-      const nextPath = `/${activeRepoId}/${conversationId}`;
+      const nextPath = `/${repoId}/${conversationId}`;
       window.history.replaceState(window.history.state, "", nextPath);
+      setLocalRepoId(repoId);
       setLocalConversationId(conversationId);
+      activeRepoIdRef.current = repoId;
       activeConversationIdRef.current = conversationId;
-      onActiveConversationChangeRef.current?.(activeRepoId, conversationId);
+      onActiveConversationChangeRef.current?.(repoId, conversationId);
       window.dispatchEvent(
         new CustomEvent("adorable:active-conversation", {
-          detail: { repoId: activeRepoId, conversationId },
+          detail: { repoId, conversationId },
         }),
       );
 
       return {
-        repoId: activeRepoId,
+        repoId,
         conversationId,
       };
-    }
-
-    const response = await fetch("/api/repos", { method: "POST" });
-    if (!response.ok) {
-      throw new Error("Failed to create a repository for this chat.");
-    }
-
-    const data = await response.json();
-    const repoId = data.id as string | undefined;
-    const conversationId = data.conversationId as string | undefined;
-
-    if (!repoId || !conversationId) {
-      throw new Error("Repository creation did not return ids.");
-    }
-
-    const nextPath = `/${repoId}/${conversationId}`;
-    window.history.replaceState(window.history.state, "", nextPath);
-    setLocalRepoId(repoId);
-    setLocalConversationId(conversationId);
-    activeRepoIdRef.current = repoId;
-    activeConversationIdRef.current = conversationId;
-    onActiveConversationChangeRef.current?.(repoId, conversationId);
-    window.dispatchEvent(
-      new CustomEvent("adorable:active-conversation", {
-        detail: { repoId, conversationId },
-      }),
-    );
-
-    return {
-      repoId,
-      conversationId,
-    };
-  }, []);
+    },
+    [],
+  );
 
   const runtimeKey = `${chatSessionIdRef.current}:${runtimeVersion}`;
+
+  const dispatchReposUpdated = useCallback(() => {
+    const repoId = activeRepoIdRef.current;
+    if (!repoId) return;
+
+    window.dispatchEvent(
+      new CustomEvent("adorable:repos-updated", {
+        detail: { repoId },
+      }),
+    );
+  }, []);
+
+  const handleChatFinish = useCallback(() => {
+    dispatchReposUpdated();
+  }, [dispatchReposUpdated]);
 
   const chat = useChat<UIMessage>({
     id: runtimeKey,
     transport: new AssistantChatTransport({
       api: "/api/chat",
       prepareSendMessagesRequest: async (options) => {
-        const active = await ensureActiveConversation();
+        const prompt = extractUserPrompt(options.messages);
+        const repoName = prompt ? prompt.slice(0, 50) : undefined;
+        const conversationTitle = prompt ? prompt.slice(0, 60) : undefined;
+        const active = await ensureActiveConversation(
+          repoName,
+          conversationTitle,
+        );
+
+        if (prompt) {
+          window.dispatchEvent(
+            new CustomEvent("adorable:metadata-optimistic", {
+              detail: {
+                repoId: active.repoId,
+                conversationId: active.conversationId,
+                repoName: repoName,
+                conversationTitle,
+              },
+            }),
+          );
+        }
 
         return {
           body: {
@@ -192,6 +266,7 @@ export const Assistant = ({
       },
     }),
     messages: seedMessages,
+    onFinish: handleChatFinish,
   });
 
   const runtime = useAISDKRuntime(chat);

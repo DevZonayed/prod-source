@@ -31,10 +31,19 @@ export async function GET(
 }
 
 export async function POST(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ repoId: string }> },
 ) {
   const { repoId } = await params;
+
+  let requestedTitle: string | undefined;
+  try {
+    const payload = (await req.json()) as { title?: string };
+    const nextTitle = payload?.title?.trim();
+    requestedTitle = nextTitle ? nextTitle : undefined;
+  } catch {
+    requestedTitle = undefined;
+  }
 
   if (!(await assertRepoAccess(repoId))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -49,7 +58,12 @@ export async function POST(
   }
 
   const conversationId = randomUUID();
-  const next = await createConversationInRepo(repoId, metadata, conversationId);
+  const next = await createConversationInRepo(
+    repoId,
+    metadata,
+    conversationId,
+    requestedTitle,
+  );
 
   return NextResponse.json({
     conversationId,

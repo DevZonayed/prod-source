@@ -33,6 +33,13 @@ type TerminalTab = {
   closable: boolean;
 };
 
+type OptimisticMetadataDetail = {
+  repoId: string;
+  conversationId: string;
+  repoName: string;
+  conversationTitle: string;
+};
+
 export function RepoWorkspaceShell({
   repoId,
   children,
@@ -91,6 +98,74 @@ export function RepoWorkspaceShell({
     if (!repoId) return;
     loadRepos();
   }, [loadRepos, repoId]);
+
+  useEffect(() => {
+    const handleReposUpdated = () => {
+      void loadRepos();
+    };
+
+    window.addEventListener("adorable:repos-updated", handleReposUpdated);
+    return () => {
+      window.removeEventListener("adorable:repos-updated", handleReposUpdated);
+    };
+  }, [loadRepos]);
+
+  useEffect(() => {
+    const handleOptimisticMetadata = (event: Event) => {
+      const customEvent = event as CustomEvent<OptimisticMetadataDetail>;
+      const detail = customEvent.detail;
+      if (!detail?.repoId || !detail?.conversationId) return;
+
+      const now = new Date().toISOString();
+
+      setRepos((previous) =>
+        previous.map((repo) => {
+          if (repo.id !== detail.repoId) return repo;
+
+          const hasConversation = repo.conversations.some(
+            (conversation) => conversation.id === detail.conversationId,
+          );
+
+          const nextConversations = hasConversation
+            ? repo.conversations.map((conversation) =>
+                conversation.id === detail.conversationId
+                  ? {
+                      ...conversation,
+                      title: detail.conversationTitle,
+                      updatedAt: now,
+                    }
+                  : conversation,
+              )
+            : [
+                {
+                  id: detail.conversationId,
+                  title: detail.conversationTitle,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+                ...repo.conversations,
+              ];
+
+          return {
+            ...repo,
+            name: repo.name === "Untitled Repo" ? detail.repoName : repo.name,
+            conversations: nextConversations,
+          };
+        }),
+      );
+    };
+
+    window.addEventListener(
+      "adorable:metadata-optimistic",
+      handleOptimisticMetadata as EventListener,
+    );
+    return () => {
+      window.removeEventListener(
+        "adorable:metadata-optimistic",
+        handleOptimisticMetadata as EventListener,
+      );
+    };
+  }, []);
 
   const handleCreateRepo = useCallback(async () => {
     window.dispatchEvent(new Event("adorable:go-home"));
