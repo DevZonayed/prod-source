@@ -3,12 +3,22 @@ import { Sidebar, useSidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  CheckIcon,
-  CircleDashedIcon,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  GlobeIcon,
   ListTreeIcon,
+  Loader2Icon,
+  MessageSquareIcon,
   PlusIcon,
   RocketIcon,
-  XIcon,
+  SettingsIcon,
 } from "lucide-react";
 
 export type RepoDeployment = {
@@ -49,6 +59,19 @@ const toDisplayConversationTitle = (title: string) => {
   return /^Conversation\s+\d+$/i.test(title.trim()) ? "" : title;
 };
 
+const formatRelativeTime = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = Date.now();
+  const diffSeconds = Math.floor((now - date.getTime()) / 1000);
+  if (diffSeconds < 60) return "just now";
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
+};
+
 const AdorableLogo = () => (
   <svg
     viewBox="0 0 347 280"
@@ -76,6 +99,10 @@ const AdorableLogo = () => (
     />
   </svg>
 );
+
+/* ------------------------------------------------------------------ */
+/*  Main sidebar                                                       */
+/* ------------------------------------------------------------------ */
 
 export function RepoSidebar({
   repos,
@@ -109,7 +136,6 @@ export function RepoSidebar({
       setOpen(false);
       return;
     }
-
     setTab(nextTab);
     setOpen(true);
   };
@@ -123,9 +149,12 @@ export function RepoSidebar({
     }
   };
 
+  const selectedRepo = repos.find((repo) => repo.id === selectedRepoId) ?? null;
+
   return (
     <Sidebar collapsible={collapsible}>
       <div className="flex h-full">
+        {/* Icon rail */}
         <div className="flex w-12 shrink-0 flex-col items-center border-r py-2">
           <button
             type="button"
@@ -155,12 +184,14 @@ export function RepoSidebar({
           </button>
         </div>
 
+        {/* Panel */}
         <div className="min-h-0 min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
           <div className="flex h-full min-h-0 flex-col">
-            <div className="relative border-b px-3 py-2.5">
-              <Button
-                variant="ghost"
-                className="flex h-9 w-full items-center justify-between gap-2 rounded-lg px-2.5 text-muted-foreground hover:text-foreground"
+            {/* Brand header */}
+            <div className="border-b px-3 py-2">
+              <button
+                type="button"
+                className="flex h-8 w-full items-center justify-between gap-2 rounded-md px-1 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
                 onClick={handleCreateRepo}
                 disabled={creatingRepo}
               >
@@ -168,103 +199,25 @@ export function RepoSidebar({
                   <AdorableLogo />
                   <span className="text-[13px] font-medium">Adorable</span>
                 </span>
-                <PlusIcon className="size-3.5" />
-              </Button>
+                <PlusIcon className="size-4" />
+              </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pt-1.5">
+            {/* Content */}
+            <div className="min-h-0 flex-1 overflow-y-auto">
               {tab === "threads" ? (
-                <div className="space-y-2 pb-2">
-                  {repos.map((repo) => (
-                    <div key={repo.id} className="rounded-md border">
-                      <div className="flex items-center justify-between gap-1 border-b px-2 py-1.5">
-                        <button
-                          type="button"
-                          className="truncate text-left text-xs font-medium text-foreground"
-                          onClick={() => {
-                            const firstConversation = repo.conversations[0];
-                            if (firstConversation) {
-                              onSelectConversation(
-                                repo.id,
-                                firstConversation.id,
-                              );
-                            }
-                          }}
-                          title={repo.name}
-                        >
-                          {repo.name}
-                        </button>
-                        <button
-                          type="button"
-                          className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                          onClick={async () => {
-                            setCreatingConversationRepoId(repo.id);
-                            try {
-                              await onCreateConversation(repo.id);
-                            } finally {
-                              setCreatingConversationRepoId(null);
-                            }
-                          }}
-                          disabled={creatingConversationRepoId === repo.id}
-                          title="New conversation"
-                        >
-                          <PlusIcon className="size-3" />
-                        </button>
-                      </div>
-
-                      <div className="space-y-0.5 p-1">
-                        {repo.conversations.map((conversation) => {
-                          const isActive =
-                            selectedRepoId === repo.id &&
-                            selectedConversationId === conversation.id;
-                          const displayTitle = toDisplayConversationTitle(
-                            conversation.title,
-                          );
-
-                          return (
-                            <button
-                              key={conversation.id}
-                              type="button"
-                              onClick={() =>
-                                onSelectConversation(repo.id, conversation.id)
-                              }
-                              className={`flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] transition-colors ${
-                                isActive
-                                  ? "bg-muted text-foreground"
-                                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                              }`}
-                            >
-                              {displayTitle ? (
-                                <span className="truncate">{displayTitle}</span>
-                              ) : (
-                                <span className="truncate text-muted-foreground/50">
-                                  &nbsp;
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
-
-                        {repo.conversations.length === 0 && (
-                          <div className="px-2 py-2 text-[11px] text-muted-foreground">
-                            No conversations yet.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-
-                  {repos.length === 0 && (
-                    <div className="px-2 py-3 text-xs text-muted-foreground">
-                      No projects yet. Create one to start.
-                    </div>
-                  )}
-                </div>
+                <ThreadsList
+                  repos={repos}
+                  selectedRepoId={selectedRepoId}
+                  selectedConversationId={selectedConversationId}
+                  onSelectConversation={onSelectConversation}
+                  onCreateConversation={onCreateConversation}
+                  creatingConversationRepoId={creatingConversationRepoId}
+                  setCreatingConversationRepoId={setCreatingConversationRepoId}
+                />
               ) : (
-                <DeploymentTimelineList
-                  repo={
-                    repos.find((repo) => repo.id === selectedRepoId) ?? null
-                  }
+                <DeploymentsList
+                  repo={selectedRepo}
                   onSetProductionDomain={onSetProductionDomain}
                   onPromoteDeployment={onPromoteDeployment}
                 />
@@ -277,7 +230,122 @@ export function RepoSidebar({
   );
 }
 
-function DeploymentTimelineList({
+/* ------------------------------------------------------------------ */
+/*  Threads tab                                                        */
+/* ------------------------------------------------------------------ */
+
+function ThreadsList({
+  repos,
+  selectedRepoId,
+  selectedConversationId,
+  onSelectConversation,
+  onCreateConversation,
+  creatingConversationRepoId,
+  setCreatingConversationRepoId,
+}: {
+  repos: RepoItem[];
+  selectedRepoId: string | null;
+  selectedConversationId: string | null;
+  onSelectConversation: (repoId: string, conversationId: string) => void;
+  onCreateConversation: (repoId: string) => Promise<void>;
+  creatingConversationRepoId: string | null;
+  setCreatingConversationRepoId: (id: string | null) => void;
+}) {
+  if (repos.length === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center px-4 py-8">
+        <p className="text-xs text-muted-foreground/50">
+          No projects yet. Create one to start.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {repos.map((repo) => (
+        <div key={repo.id}>
+          {/* Repo header */}
+          <div className="flex items-center gap-2 border-b px-3 py-2">
+            <button
+              type="button"
+              className="min-w-0 flex-1 truncate text-left text-[13px] font-medium text-foreground"
+              onClick={() => {
+                const first = repo.conversations[0];
+                if (first) onSelectConversation(repo.id, first.id);
+              }}
+              title={repo.name}
+            >
+              {repo.name}
+            </button>
+            <button
+              type="button"
+              className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+              onClick={async () => {
+                setCreatingConversationRepoId(repo.id);
+                try {
+                  await onCreateConversation(repo.id);
+                } finally {
+                  setCreatingConversationRepoId(null);
+                }
+              }}
+              disabled={creatingConversationRepoId === repo.id}
+              title="New conversation"
+            >
+              <PlusIcon className="size-3.5" />
+            </button>
+          </div>
+
+          {/* Conversations */}
+          {repo.conversations.length === 0 ? (
+            <div className="border-b px-3 py-3 text-xs text-muted-foreground/50">
+              No conversations yet.
+            </div>
+          ) : (
+            repo.conversations.map((conversation) => {
+              const isActive =
+                selectedRepoId === repo.id &&
+                selectedConversationId === conversation.id;
+              const displayTitle = toDisplayConversationTitle(
+                conversation.title,
+              );
+
+              return (
+                <button
+                  key={conversation.id}
+                  type="button"
+                  onClick={() => onSelectConversation(repo.id, conversation.id)}
+                  className={`flex w-full items-center gap-2 border-b px-3 py-2 text-left transition-colors ${
+                    isActive
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:bg-muted/30 hover:text-foreground"
+                  }`}
+                >
+                  <MessageSquareIcon className="size-3.5 shrink-0 opacity-40" />
+                  {displayTitle ? (
+                    <span className="min-w-0 flex-1 truncate text-[13px]">
+                      {displayTitle}
+                    </span>
+                  ) : (
+                    <span className="min-w-0 flex-1 truncate text-[13px] opacity-30">
+                      Untitled
+                    </span>
+                  )}
+                </button>
+              );
+            })
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Deployments tab                                                    */
+/* ------------------------------------------------------------------ */
+
+function DeploymentsList({
   repo,
   onSetProductionDomain,
   onPromoteDeployment,
@@ -286,27 +354,165 @@ function DeploymentTimelineList({
   onSetProductionDomain: (repoId: string, domain: string) => Promise<void>;
   onPromoteDeployment: (repoId: string, deploymentId: string) => Promise<void>;
 }) {
-  const [domainInput, setDomainInput] = React.useState("");
-  const [isSavingDomain, setIsSavingDomain] = React.useState(false);
   const [isPromotingId, setIsPromotingId] = React.useState<string | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    setDomainInput(repo?.productionDomain ?? "");
-    setError(null);
-  }, [repo?.id, repo?.productionDomain]);
 
   if (!repo) {
     return (
-      <div className="px-2 py-3 text-xs text-muted-foreground">
-        Select a project to view deployments.
+      <div className="flex flex-1 items-center justify-center px-4 py-8">
+        <p className="text-xs text-muted-foreground/50">
+          Select a project to view deployments.
+        </p>
       </div>
     );
   }
 
   const items = repo.deployments;
 
-  const handleSaveDomain = async () => {
+  const handlePromote = async (deploymentId: string) => {
+    setIsPromotingId(deploymentId);
+    try {
+      await onPromoteDeployment(repo.id, deploymentId);
+    } catch {
+      // visible from state
+    } finally {
+      setIsPromotingId(null);
+    }
+  };
+
+  return (
+    <div>
+      {/* Domain row — mirrors repo header style */}
+      <div className="flex items-center gap-2 border-b px-3 py-2">
+        {repo.productionDomain ? (
+          <>
+            <GlobeIcon className="size-3.5 shrink-0 text-emerald-500" />
+            <a
+              href={`https://${repo.productionDomain}`}
+              target="_blank"
+              rel="noreferrer"
+              className="min-w-0 flex-1 truncate text-[13px] text-foreground hover:underline"
+            >
+              {repo.productionDomain}
+            </a>
+          </>
+        ) : (
+          <span className="min-w-0 flex-1 text-[13px] text-muted-foreground/50">
+            No domain
+          </span>
+        )}
+        <ConfigureDomainDialog
+          repo={repo}
+          onSetProductionDomain={onSetProductionDomain}
+        />
+      </div>
+
+      {/* Deployment rows — same row rhythm as conversations */}
+      {items.length === 0 ? (
+        <div className="px-3 py-6 text-center text-xs text-muted-foreground/50">
+          No deployments yet.
+        </div>
+      ) : (
+        items.map((entry) => {
+          const isProduction =
+            !!entry.deploymentId &&
+            repo.productionDeploymentId === entry.deploymentId;
+          const isPromoting = isPromotingId === entry.deploymentId;
+          const canPromote =
+            !!entry.deploymentId &&
+            !!repo.productionDomain &&
+            entry.state === "live" &&
+            !isProduction;
+
+          return (
+            <a
+              key={`${entry.commitSha}-${entry.url}`}
+              href={entry.url}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-2 border-b px-3 py-2 transition-colors last:border-b-0 hover:bg-muted/30"
+            >
+              {/* Status indicator */}
+              {entry.state === "deploying" ? (
+                <Loader2Icon className="size-3.5 shrink-0 animate-spin text-amber-400" />
+              ) : entry.state === "live" ? (
+                <span className="flex size-3.5 shrink-0 items-center justify-center">
+                  <span className="size-2 rounded-full bg-emerald-500" />
+                </span>
+              ) : entry.state === "failed" ? (
+                <span className="flex size-3.5 shrink-0 items-center justify-center">
+                  <span className="size-2 rounded-full bg-red-500" />
+                </span>
+              ) : (
+                <span className="flex size-3.5 shrink-0 items-center justify-center">
+                  <span className="size-2 rounded-full bg-muted-foreground/30" />
+                </span>
+              )}
+
+              {/* Content */}
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] text-foreground">
+                  {entry.commitMessage}
+                </div>
+                <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <span>{formatRelativeTime(entry.commitDate)}</span>
+                  {isProduction && (
+                    <>
+                      <span className="text-muted-foreground/30">·</span>
+                      <span className="text-emerald-400">prod</span>
+                    </>
+                  )}
+                  {canPromote && (
+                    <>
+                      <span className="text-muted-foreground/30">·</span>
+                      <button
+                        type="button"
+                        className="text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline disabled:opacity-50"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (!entry.deploymentId) return;
+                          void handlePromote(entry.deploymentId);
+                        }}
+                        disabled={isPromoting}
+                      >
+                        {isPromoting ? "promoting…" : "promote"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </a>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Domain config dialog                                               */
+/* ------------------------------------------------------------------ */
+
+function ConfigureDomainDialog({
+  repo,
+  onSetProductionDomain,
+}: {
+  repo: RepoItem;
+  onSetProductionDomain: (repoId: string, domain: string) => Promise<void>;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [domainInput, setDomainInput] = React.useState("");
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (open) {
+      setDomainInput(repo.productionDomain ?? "");
+      setError(null);
+    }
+  }, [open, repo.productionDomain]);
+
+  const handleSave = async () => {
     const nextDomain = domainInput.trim().toLowerCase();
     if (!nextDomain.endsWith(".style.dev")) {
       setError("Domain must end in .style.dev");
@@ -314,188 +520,75 @@ function DeploymentTimelineList({
     }
 
     setError(null);
-    setIsSavingDomain(true);
+    setIsSaving(true);
     try {
       await onSetProductionDomain(repo.id, nextDomain);
+      setOpen(false);
     } catch (saveError) {
       setError(
         saveError instanceof Error
           ? saveError.message
-          : "Failed to save production domain",
+          : "Failed to save domain",
       );
     } finally {
-      setIsSavingDomain(false);
+      setIsSaving(false);
     }
   };
-
-  const handlePromote = async (deploymentId: string) => {
-    setError(null);
-    setIsPromotingId(deploymentId);
-    try {
-      await onPromoteDeployment(repo.id, deploymentId);
-    } catch (promoteError) {
-      setError(
-        promoteError instanceof Error
-          ? promoteError.message
-          : "Failed to promote deployment",
-      );
-    } finally {
-      setIsPromotingId(null);
-    }
-  };
-
-  if (!items.length) {
-    return (
-      <div className="space-y-2 px-1 pb-2">
-        <div className="space-y-1.5 rounded-md border p-2">
-          <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
-            Production domain
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Input
-              value={domainInput}
-              onChange={(event) => setDomainInput(event.target.value)}
-              placeholder="my-app.style.dev"
-              className="h-8 text-xs"
-            />
-            <Button
-              type="button"
-              size="sm"
-              className="h-8 px-2 text-xs"
-              onClick={handleSaveDomain}
-              disabled={isSavingDomain}
-            >
-              Save
-            </Button>
-          </div>
-          {error ? (
-            <div className="text-[10px] text-muted-foreground">{error}</div>
-          ) : (
-            <div className="text-[10px] text-muted-foreground">
-              Domain must end in .style.dev
-            </div>
-          )}
-        </div>
-        <div className="px-1 py-2 text-xs text-muted-foreground">
-          No deployments yet.
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="h-full space-y-3 overflow-x-hidden overflow-y-auto px-1 pb-2">
-      <div className="space-y-1.5 rounded-md border p-2">
-        <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
-          Production domain
-        </div>
-        <div className="flex items-center gap-1.5">
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          title="Configure production domain"
+        >
+          <SettingsIcon className="size-3.5" />
+        </button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Production Domain</DialogTitle>
+          <DialogDescription>
+            Set a custom <span className="font-medium">.style.dev</span> domain
+            for your production deployments.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-1.5">
           <Input
             value={domainInput}
-            onChange={(event) => setDomainInput(event.target.value)}
+            onChange={(event) => {
+              setDomainInput(event.target.value);
+              setError(null);
+            }}
             placeholder="my-app.style.dev"
-            className="h-8 text-xs"
+            onKeyDown={(event) => {
+              if (event.key === "Enter") void handleSave();
+            }}
           />
+          {error && <p className="text-[13px] text-destructive">{error}</p>}
+        </div>
+        <DialogFooter>
           <Button
             type="button"
-            size="sm"
-            className="h-8 px-2 text-xs"
-            onClick={handleSaveDomain}
-            disabled={isSavingDomain}
+            variant="ghost"
+            onClick={() => setOpen(false)}
+            disabled={isSaving}
           >
-            Save
+            Cancel
           </Button>
-        </div>
-        <div className="text-[10px] text-muted-foreground">
-          {error
-            ? error
-            : repo.productionDomain
-              ? `Current: ${repo.productionDomain}`
-              : "Domain must end in .style.dev"}
-        </div>
-      </div>
-      {items.map((entry) => (
-        <div
-          key={`${entry.commitSha}-${entry.url}`}
-          className="space-y-1.5 rounded-md border p-2"
-        >
-          <div className="flex items-center gap-1.5 text-[10px] tracking-wide text-muted-foreground uppercase">
-            {entry.state === "deploying" ? (
-              <CircleDashedIcon className="size-3 animate-spin" />
-            ) : entry.state === "live" ? (
-              <CheckIcon className="size-3" />
-            ) : entry.state === "failed" ? (
-              <XIcon className="size-3" />
+          <Button type="button" onClick={handleSave} disabled={isSaving}>
+            {isSaving ? (
+              <>
+                <Loader2Icon className="size-4 animate-spin" />
+                Saving…
+              </>
             ) : (
-              <RocketIcon className="size-3" />
+              "Save"
             )}
-            <span>{entry.state}</span>
-          </div>
-          <a
-            href={entry.url}
-            target="_blank"
-            rel="noreferrer"
-            className="block truncate text-xs font-medium text-foreground hover:underline"
-            title={entry.url}
-          >
-            {entry.domain}
-          </a>
-          <div
-            className="truncate text-[10px] text-muted-foreground"
-            title={entry.commitMessage}
-          >
-            {entry.commitMessage}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Button
-              type="button"
-              size="sm"
-              className="h-7 px-2 text-[11px]"
-              onClick={() => {
-                if (!entry.deploymentId) return;
-                void handlePromote(entry.deploymentId);
-              }}
-              disabled={
-                !entry.deploymentId ||
-                !repo.productionDomain ||
-                isPromotingId === entry.deploymentId
-              }
-            >
-              Promote
-            </Button>
-            {repo.productionDeploymentId === entry.deploymentId &&
-            entry.deploymentId ? (
-              <span className="text-[10px] tracking-wide text-muted-foreground uppercase">
-                Production
-              </span>
-            ) : null}
-          </div>
-          {entry.state === "deploying" ? (
-            <div className="flex h-20 items-center justify-center rounded border bg-background">
-              <div className="flex items-center gap-1.5 text-[10px] tracking-wide text-muted-foreground uppercase">
-                <CircleDashedIcon className="size-3 animate-spin" />
-                <span>Deploying preview…</span>
-              </div>
-            </div>
-          ) : (
-            <a
-              href={entry.url}
-              target="_blank"
-              rel="noreferrer"
-              className="block h-20 cursor-pointer overflow-hidden rounded border bg-background"
-              title={`Open ${entry.domain}`}
-            >
-              <iframe
-                src={entry.url}
-                className="pointer-events-none block h-[500%] w-[500%] origin-top-left scale-[0.2] border-0"
-                loading="lazy"
-                scrolling="no"
-                title={`deployment-${entry.commitSha}`}
-              />
-            </a>
-          )}
-        </div>
-      ))}
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
