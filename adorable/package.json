@@ -23,7 +23,7 @@
     "@assistant-ui/react-markdown": "^0.12.0",
     "@freestyle-sh/with-dev-server": "^0.1.5",
     "@freestyle-sh/with-pty": "^0.0.2",
-    "@freestyle-sh/with-ttyd": "^0.0.6",
+    "@freestyle-sh/with-ttyd": "^0.0.7",
     "@mastra/mcp": "^1.0.0",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-collapsible": "^1.1.12",

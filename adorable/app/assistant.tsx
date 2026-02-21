@@ -22,6 +22,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
+  ExternalLinkIcon,
   Loader2Icon,
   PlusIcon,
   RotateCwIcon,
@@ -30,9 +31,16 @@ import {
 import { cn } from "@/lib/utils";
 
 type AdorableMetadata = {
+  repoId?: string;
   previewUrl?: string;
   devCommandTerminalUrl?: string;
   additionalTerminalsUrl?: string;
+};
+
+type DeploymentStatus = {
+  state: "idle" | "deploying" | "live" | "failed";
+  url: string | null;
+  commitSha: string | null;
 };
 
 const cloud = new AssistantCloud({
@@ -67,6 +75,15 @@ function MainContent() {
   const hasPreview = useAuiState(({ thread }) =>
     thread.messages.some((message) => message.metadata?.custom?.adorable),
   );
+  const metadata = useAuiState<AdorableMetadata | undefined>(({ thread }) => {
+    for (let i = thread.messages.length - 1; i >= 0; i -= 1) {
+      const m = thread.messages[i]?.metadata?.custom?.adorable as
+        | AdorableMetadata
+        | undefined;
+      if (m) return m;
+    }
+    return undefined;
+  });
   const { setOpen, isMobile } = useSidebar();
   const wasEmptyRef = useRef(isEmpty);
 
@@ -96,6 +113,91 @@ function MainContent() {
       >
         {!isEmpty && (hasPreview ? <AppPreview /> : <PreviewPlaceholder />)}
       </div>
+    </div>
+  );
+}
+
+function DeploymentStatusBadge({
+  repoId,
+  isAgentRunning,
+}: {
+  repoId?: string;
+  isAgentRunning: boolean;
+}) {
+  const [status, setStatus] = useState<DeploymentStatus | null>(null);
+
+  useEffect(() => {
+    if (!repoId) {
+      setStatus(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const params = new URLSearchParams({
+          repoId,
+          running: isAgentRunning ? "1" : "0",
+        });
+        const response = await fetch(
+          `/api/deployment-status?${params.toString()}`,
+        );
+        if (!response.ok) return;
+        const data = await response.json();
+        if (cancelled) return;
+        setStatus({
+          state: data.state,
+          url: data.url ?? null,
+          commitSha: data.commitSha ?? null,
+        });
+      } catch {}
+    };
+
+    poll();
+    const interval = window.setInterval(poll, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [repoId, isAgentRunning]);
+
+  if (!status) return null;
+  const show =
+    status.state === "deploying" ||
+    status.state === "live" ||
+    status.state === "failed";
+  if (!show) return null;
+
+  const label =
+    status.state === "deploying"
+      ? "Deploying…"
+      : status.state === "live"
+        ? "Deployment live"
+        : "Deployment failed";
+
+  return (
+    <div className="ml-2 inline-flex items-center gap-2 rounded-md border bg-background px-2 py-1 text-[11px] shadow-sm">
+      {status.state === "deploying" && (
+        <Loader2Icon className="size-3.5 animate-spin text-muted-foreground" />
+      )}
+      <span className="font-medium">{label}</span>
+      {status.commitSha && (
+        <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+          {status.commitSha.slice(0, 7)}
+        </span>
+      )}
+      {status.state === "live" && status.url && (
+        <a
+          href={status.url}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+        >
+          Open
+          <ExternalLinkIcon className="size-3" />
+        </a>
+      )}
     </div>
   );
 }
@@ -180,6 +282,7 @@ function AppPreview() {
     }
     return undefined;
   });
+  const isAgentRunning = useAuiState(({ thread }) => thread.isRunning);
 
   const [extraTerminals, setExtraTerminals] = useState<TerminalTab[]>([]);
   const [activeTab, setActiveTab] = useState("dev-server");
@@ -240,6 +343,8 @@ function AppPreview() {
             <BrowserToolbar
               previewUrl={metadata.previewUrl}
               iframeRef={iframeRef}
+              repoId={metadata.repoId}
+              isAgentRunning={isAgentRunning}
             />
             <div className="relative min-h-0 flex-1">
               {!iframeLoaded && (
@@ -366,9 +471,13 @@ function AppPreview() {
 function BrowserToolbar({
   previewUrl,
   iframeRef,
+  repoId,
+  isAgentRunning,
 }: {
   previewUrl: string;
   iframeRef: React.RefObject<HTMLIFrameElement | null>;
+  repoId?: string;
+  isAgentRunning: boolean;
 }) {
   const [urlValue, setUrlValue] = useState(() => {
     try {
@@ -467,6 +576,7 @@ function BrowserToolbar({
           aria-label="URL path"
         />
       </form>
+      <DeploymentStatusBadge repoId={repoId} isAgentRunning={isAgentRunning} />
     </div>
   );
 }

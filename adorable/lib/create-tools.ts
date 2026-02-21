@@ -1,7 +1,12 @@
 import { tool } from "ai";
-import { Vm } from "freestyle-sandboxes";
+import { freestyle, Vm } from "freestyle-sandboxes";
 import { z } from "zod";
+import { getDomainForCommit, getLatestCommitSha } from "./deployment-status";
 import { WORKDIR, VM_PORT } from "./vars";
+
+type CreateToolsOptions = {
+  repoId?: string;
+};
 
 const normalizeRelativePath = (rawPath: string): string | null => {
   const value = rawPath.trim();
@@ -18,7 +23,7 @@ const shellQuote = (value: string): string => {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 };
 
-export const createTools = (vm: Vm) => {
+export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
   const runExecCommand = async (command: string) => {
     const execResult = await vm.exec({ command });
     if (typeof execResult === "string") {
@@ -317,7 +322,28 @@ export const createTools = (vm: Vm) => {
       )} && git -C ${shellQuote(WORKDIR)} commit -am ${shellQuote(
         message,
       )} && git -C ${shellQuote(WORKDIR)} push`;
-      return runExecCommand(gitCommand);
+      const commitResult = await runExecCommand(gitCommand);
+
+      if (commitResult.ok && options?.repoId) {
+        void (async () => {
+          const commitSha = await getLatestCommitSha(options.repoId!);
+          if (!commitSha) return;
+
+          const deploymentDomain = getDomainForCommit(commitSha);
+          await freestyle.serverless.deployments.create({
+            repo: options.repoId!,
+            domains: [deploymentDomain],
+            build: true,
+          });
+        })().catch((error) => {
+          console.error("Post-commit deploy failed:", error);
+        });
+      }
+
+      return {
+        ...commitResult,
+        deploymentQueued: commitResult.ok,
+      };
     },
   });
 

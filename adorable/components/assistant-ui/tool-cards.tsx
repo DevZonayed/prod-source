@@ -386,3 +386,63 @@ export const DevServerLogsToolCard: ToolCallMessagePartComponent = ({
     />
   );
 };
+
+export const DeploymentStatusToolCard: ToolCallMessagePartComponent = ({
+  argsText,
+  result,
+  status,
+}) => {
+  const a = parse(argsText);
+  const r = obj(result);
+  const path = str(a.path) ?? "/";
+  const state = str(r.state) ?? "idle";
+  const commitSha = str(r.commitSha);
+  const domain =
+    str(r.url)
+      ?.replace(/^https?:\/\//, "")
+      .split("/")[0] ?? null;
+  const running = status?.type === "running" || state === "deploying";
+  const isLive = r.isLive === true;
+  const statusCode = typeof r.statusCode === "number" ? r.statusCode : null;
+
+  return (
+    <div className="my-0.5 inline-flex items-center gap-2 rounded-md px-2 py-1 text-sm">
+      <span className="flex w-4 shrink-0 items-center justify-center">
+        {running ? (
+          <CircleDashedIcon className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
+        ) : isLive ? (
+          <CheckIcon className="size-3.5 shrink-0 text-green-500" />
+        ) : (
+          <XIcon className="size-3.5 shrink-0 text-red-500" />
+        )}
+      </span>
+      <span className="font-medium">
+        {running
+          ? "Deploying…"
+          : isLive
+            ? "Deployment is live"
+            : "Deployment pending"}
+      </span>
+      {!running && statusCode !== null && (
+        <span
+          className={cn(
+            "rounded px-1.5 py-0.5 font-mono text-xs",
+            isLive
+              ? "bg-green-500/10 text-green-500"
+              : "bg-red-500/10 text-red-500",
+          )}
+        >
+          {statusCode}
+        </span>
+      )}
+      <span className="min-w-0 truncate text-muted-foreground">
+        {domain ? `${domain}${path}` : path}
+      </span>
+      {commitSha && (
+        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+          {commitSha.slice(0, 7)}
+        </span>
+      )}
+    </div>
+  );
+};

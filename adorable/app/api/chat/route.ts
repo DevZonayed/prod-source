@@ -33,7 +33,6 @@ type MessageMetadata = {
     adorable?: AdorableMetadata;
   };
 };
-
 const devCommandPty = new VmPtySession({
   sessionId: "adorable-dev-command",
 });
@@ -49,6 +48,9 @@ const spec = new VmSpec({
     devCommandTerminal: new VmWebTerminal({
       pty: devCommandPty,
       port: DEV_COMMAND_TERMINAL_PORT,
+      theme: {
+        background: "#09090b",
+      },
     }),
     additionalTerminals: new VmWebTerminal({
       cwd: WORKDIR,
@@ -164,7 +166,9 @@ export async function POST(req: Request) {
     spec: spec,
   });
 
-  const tools = createVmTools(vm);
+  const tools = createVmTools(vm, {
+    repoId: resolvedMetadata?.repoId,
+  });
 
   const result = streamText({
     system: SYSTEM_PROMPT,
