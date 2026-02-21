@@ -372,15 +372,15 @@ function AppPreview() {
           {/* Terminal panel */}
           <div className="flex h-[30%] min-h-0 flex-col">
             {/* Tab bar */}
-            <div className="flex shrink-0 items-center gap-0 border-y bg-muted/30 px-1">
+            <div className="flex shrink-0 items-center gap-0 border-y bg-[rgb(43,43,43)] px-1">
               {allTabs.map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`group flex items-center gap-1 px-3 py-1.5 text-xs transition-colors ${
+                  className={`group flex items-center gap-1 px-2 py-1.5 text-xs transition-colors ${
                     activeTab === tab.id
-                      ? "border-b-2 border-foreground bg-background text-foreground"
+                      ? "border-b-2 border-foreground bg-[rgb(43,43,43)] text-foreground"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
