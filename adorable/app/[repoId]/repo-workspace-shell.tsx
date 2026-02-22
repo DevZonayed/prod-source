@@ -11,11 +11,14 @@ import {
   ArrowLeftIcon,
   ArrowRightIcon,
   ChevronLeftIcon,
+  CodeIcon,
   Loader2Icon,
+  MonitorIcon,
   PlusIcon,
   RotateCwIcon,
   XIcon,
 } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type TerminalTab = {
   id: string;
@@ -260,6 +263,20 @@ export function RepoWorkspaceShell({
     ? (repos.find((repo) => repo.id === repoId) ?? null)
     : null;
   const showWorkspacePanel = Boolean(repoId);
+  const isMobile = useIsMobile();
+  const [mobileView, setMobileView] = useState<"chat" | "preview">("chat");
+
+  // Reset to chat view when navigating away
+  useEffect(() => {
+    if (!repoId) setMobileView("chat");
+  }, [repoId]);
+
+  // On mobile, compute which panel to show
+  const gridColumns = (() => {
+    if (!showWorkspacePanel) return "1fr 0fr";
+    if (isMobile) return mobileView === "chat" ? "1fr 0fr" : "0fr 1fr";
+    return "2fr 3fr";
+  })();
 
   const conversationsContextValue = useMemo(
     () => ({
@@ -334,80 +351,121 @@ export function RepoWorkspaceShell({
           {/* Unified top bar */}
           {repoId && selectedRepo && (
             <div
-              className="grid h-11 shrink-0 border-b bg-background transition-[grid-template-columns] duration-500 ease-in-out"
-              style={{
-                gridTemplateColumns: showWorkspacePanel ? "2fr 3fr" : "1fr 0fr",
-              }}
+              className={cn(
+                "shrink-0 border-b bg-background transition-[grid-template-columns] duration-500 ease-in-out",
+                isMobile ? "flex h-11 items-center" : "grid h-11",
+              )}
+              style={
+                isMobile ? undefined : { gridTemplateColumns: gridColumns }
+              }
             >
               {/* Left: back button */}
-              <div className="flex items-center px-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (selectedConversationId) {
-                      // On conversation page → go back to repo page
-                      window.dispatchEvent(
-                        new CustomEvent("adorable:go-to-repo", {
-                          detail: { repoId },
-                        }),
-                      );
-                      router.push(`/${repoId}`);
-                    } else {
-                      // On repo page → go back to home
-                      window.dispatchEvent(new Event("adorable:go-home"));
-                      router.push("/");
+              {(!isMobile || mobileView === "chat") && (
+                <div className="flex items-center px-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedConversationId) {
+                        window.dispatchEvent(
+                          new CustomEvent("adorable:go-to-repo", {
+                            detail: { repoId },
+                          }),
+                        );
+                        router.push(`/${repoId}`);
+                      } else {
+                        window.dispatchEvent(new Event("adorable:go-home"));
+                        router.push("/");
+                      }
+                    }}
+                    className="flex items-center gap-1 rounded-md px-1.5 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    title={
+                      selectedConversationId ? "All conversations" : "All apps"
                     }
-                  }}
-                  className="flex items-center gap-1 rounded-md px-1.5 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                  title={
-                    selectedConversationId ? "All conversations" : "All apps"
-                  }
-                >
-                  <ChevronLeftIcon className="size-3.5" />
-                  <span className="text-sm font-medium">
-                    {selectedConversationId ? "All Conversations" : "All Apps"}
-                  </span>
-                </button>
-              </div>
+                  >
+                    <ChevronLeftIcon className="size-3.5" />
+                    <span className="text-sm font-medium">
+                      {selectedConversationId
+                        ? "All Conversations"
+                        : "All Apps"}
+                    </span>
+                  </button>
+                </div>
+              )}
 
-              {/* Right: browser controls + publish */}
-              <div
-                className={cn(
-                  "flex items-center gap-1 px-2 transition-opacity duration-500",
-                  showWorkspacePanel
-                    ? "opacity-100"
-                    : "pointer-events-none opacity-0",
-                )}
-              >
-                {showWorkspacePanel &&
-                  selectedRepo.vm?.previewUrl &&
-                  vmReady && (
-                    <BrowserControls
-                      previewUrl={selectedRepo.vm.previewUrl}
-                      iframeRef={iframeRef}
-                      repo={selectedRepo}
-                      onSetProductionDomain={onSetProductionDomain}
-                      onPromoteDeployment={onPromoteDeployment}
-                    />
+              {/* Mobile preview top bar: back to chat + publish */}
+              {isMobile && mobileView === "preview" && (
+                <div className="flex flex-1 items-center gap-1 px-2">
+                  <button
+                    type="button"
+                    onClick={() => setMobileView("chat")}
+                    className="flex items-center gap-1 rounded-md px-1.5 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <ChevronLeftIcon className="size-3.5" />
+                    <span className="text-sm font-medium">Chat</span>
+                  </button>
+                  <div className="ml-auto">
+                    {selectedRepo.vm?.previewUrl && vmReady && (
+                      <PublishDialog
+                        repo={selectedRepo}
+                        onSetProductionDomain={onSetProductionDomain}
+                        onPromoteDeployment={onPromoteDeployment}
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Right: browser controls + publish (desktop only) */}
+              {!isMobile && (
+                <div
+                  className={cn(
+                    "flex items-center gap-1 px-2 transition-opacity duration-500",
+                    showWorkspacePanel
+                      ? "opacity-100"
+                      : "pointer-events-none opacity-0",
                   )}
-              </div>
+                >
+                  {showWorkspacePanel &&
+                    selectedRepo.vm?.previewUrl &&
+                    vmReady && (
+                      <BrowserControls
+                        previewUrl={selectedRepo.vm.previewUrl}
+                        iframeRef={iframeRef}
+                        repo={selectedRepo}
+                        onSetProductionDomain={onSetProductionDomain}
+                        onPromoteDeployment={onPromoteDeployment}
+                      />
+                    )}
+                </div>
+              )}
             </div>
           )}
 
           {/* Main content grid */}
           <div
-            className="grid min-h-0 flex-1 pb-2 transition-[grid-template-columns] duration-500 ease-in-out"
-            style={{
-              gridTemplateColumns: showWorkspacePanel ? "2fr 3fr" : "1fr 0fr",
-            }}
+            className={cn(
+              "grid min-h-0 flex-1 pb-2",
+              !isMobile &&
+                "transition-[grid-template-columns] duration-500 ease-in-out",
+            )}
+            style={isMobile ? undefined : { gridTemplateColumns: gridColumns }}
           >
-            <div className="relative min-w-0 overflow-hidden">{children}</div>
             <div
               className={cn(
-                "min-w-0 overflow-hidden transition-opacity duration-500",
-                showWorkspacePanel
+                "relative min-w-0 overflow-hidden",
+                isMobile && mobileView === "preview" && "hidden",
+              )}
+            >
+              {children}
+            </div>
+            <div
+              className={cn(
+                "min-w-0 overflow-hidden",
+                !isMobile && "transition-opacity duration-500",
+                showWorkspacePanel && (!isMobile || mobileView === "preview")
                   ? "opacity-100"
-                  : "pointer-events-none opacity-0",
+                  : !isMobile && "pointer-events-none opacity-0",
+                isMobile && mobileView === "chat" && "hidden",
               )}
             >
               {showWorkspacePanel &&
@@ -421,6 +479,24 @@ export function RepoWorkspaceShell({
                 ))}
             </div>
           </div>
+
+          {/* Mobile floating toggle button */}
+          {isMobile && showWorkspacePanel && (
+            <button
+              type="button"
+              onClick={() =>
+                setMobileView((v) => (v === "chat" ? "preview" : "chat"))
+              }
+              className="fixed right-4 bottom-20 z-50 flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95"
+              title={mobileView === "chat" ? "Show preview" : "Show chat"}
+            >
+              {mobileView === "chat" ? (
+                <MonitorIcon className="size-5" />
+              ) : (
+                <CodeIcon className="size-5" />
+              )}
+            </button>
+          )}
         </div>
       </ProjectConversationsProvider>
     </ReposProvider>

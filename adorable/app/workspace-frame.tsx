@@ -109,8 +109,8 @@ export function WorkspaceFrame({ children }: { children: React.ReactNode }) {
       selectedConversationIdOverride={effectiveConversationId}
     >
       {children}
-      {/* Settings button – fixed bottom-left */}
-      <div className="fixed right-3 bottom-3 z-50">
+      {/* Settings button */}
+      <div className="fixed bottom-3 left-3 z-50 md:right-3 md:left-auto">
         <ApiKeySettingsDialog />
       </div>
     </RepoWorkspaceShell>

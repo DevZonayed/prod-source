@@ -141,21 +141,23 @@ const ThreadWelcome: FC = () => {
               />
             </svg>
           )}
-          <h1 className="aui-thread-welcome-message-inner animate-in text-3xl font-semibold tracking-tight duration-300 fade-in slide-in-from-bottom-2">
+          <h1 className="aui-thread-welcome-message-inner animate-in text-2xl font-semibold tracking-tight duration-300 fade-in slide-in-from-bottom-2 md:text-3xl">
             {isHome ? "What do you want to build?" : ""}
           </h1>
         </div>
 
         {/* Projects on home screen */}
         {hasProjects && (
-          <div className="mt-8 w-full max-w-md animate-in delay-100 duration-300 fade-in slide-in-from-bottom-2">
+          <div className="mt-8 w-full max-w-md animate-in px-4 delay-100 duration-300 fade-in slide-in-from-bottom-2">
             <p className="mb-3 text-center text-xs font-medium text-muted-foreground/50">
               Your projects
             </p>
             <div
               className={cn(
                 "grid gap-2",
-                repos.length === 1 ? "grid-cols-1" : "grid-cols-2",
+                repos.length === 1
+                  ? "grid-cols-1"
+                  : "grid-cols-1 sm:grid-cols-2",
               )}
             >
               {repos.map((repo) => (
