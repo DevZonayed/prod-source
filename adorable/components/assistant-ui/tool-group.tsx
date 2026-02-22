@@ -1,7 +1,8 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { CheckIcon, ChevronRightIcon } from "lucide-react";
+import { useMessage } from "@assistant-ui/react";
+import { CheckIcon, ChevronRightIcon, CircleDashedIcon } from "lucide-react";
 import { type FC, type PropsWithChildren, useState } from "react";
 
 /* ------------------------------------------------------------------ */
@@ -17,11 +18,19 @@ type GroupingFunction = (parts: readonly any[]) => MessagePartGroup[];
 /*  doesn't need to access message context.                           */
 /* ------------------------------------------------------------------ */
 
-type ToolInfo = { toolName: string; args: Record<string, unknown> };
+type ToolInfo = {
+  toolName: string;
+  args: Record<string, unknown>;
+  statusType?: string;
+};
 
-const encodeToolGroup = (tools: ToolInfo[]): string => {
-  // Compact JSON encoding of tools for the group key
-  return JSON.stringify(tools);
+type EncodedGroup = {
+  tools: ToolInfo[];
+  isTrailing: boolean;
+};
+
+const encodeToolGroup = (tools: ToolInfo[], isTrailing: boolean): string => {
+  return JSON.stringify({ tools, isTrailing } satisfies EncodedGroup);
 };
 
 export const groupConsecutiveToolCalls: GroupingFunction = (parts) => {
@@ -51,11 +60,12 @@ export const groupConsecutiveToolCalls: GroupingFunction = (parts) => {
       currentToolInfos!.push({
         toolName: part.toolName ?? "",
         args: part.args ?? {},
+        statusType: part.status?.type,
       });
     } else {
       if (currentToolIndices && currentToolInfos) {
         groups.push({
-          groupKey: encodeToolGroup(currentToolInfos),
+          groupKey: encodeToolGroup(currentToolInfos, false),
           indices: currentToolIndices,
         });
         currentToolIndices = null;
@@ -66,8 +76,9 @@ export const groupConsecutiveToolCalls: GroupingFunction = (parts) => {
   }
 
   if (currentToolIndices && currentToolInfos) {
+    // This is the last group in the message — mark it as trailing
     groups.push({
-      groupKey: encodeToolGroup(currentToolInfos),
+      groupKey: encodeToolGroup(currentToolInfos, true),
       indices: currentToolIndices,
     });
   }
@@ -152,6 +163,9 @@ export const ToolCallGroup: FC<
   PropsWithChildren<{ groupKey: string | undefined; indices: number[] }>
 > = ({ groupKey, indices, children }) => {
   const [open, setOpen] = useState(false);
+  const messageIsRunning = useMessage(
+    (state) => state.status?.type === "running",
+  );
 
   // Ungrouped parts render normally
   if (!groupKey) return <>{children}</>;
@@ -163,13 +177,20 @@ export const ToolCallGroup: FC<
 
   // Decode tool info from the groupKey
   let tools: ToolInfo[] = [];
+  let isTrailing = false;
   try {
-    tools = JSON.parse(groupKey) as ToolInfo[];
+    const decoded = JSON.parse(groupKey) as EncodedGroup;
+    tools = decoded.tools;
+    isTrailing = decoded.isTrailing;
   } catch {
     // fallback
   }
 
   const summary = summarize(tools);
+  const anyToolRunning = tools.some((t) => t.statusType === "running");
+  // Show spinner if any tool is running, OR if this is the trailing group
+  // and the message is still streaming (more tools may arrive)
+  const showSpinner = anyToolRunning || (isTrailing && messageIsRunning);
 
   return (
     <div className="my-0.5">
@@ -178,7 +199,11 @@ export const ToolCallGroup: FC<
         onClick={() => setOpen((v) => !v)}
         className="inline-flex max-w-full items-center gap-1.5 rounded px-2 py-1 text-left text-sm text-muted-foreground transition-colors hover:bg-muted/60"
       >
-        <CheckIcon className="size-3.5 shrink-0" />
+        {showSpinner ? (
+          <CircleDashedIcon className="size-3.5 shrink-0 animate-spin" />
+        ) : (
+          <CheckIcon className="size-3.5 shrink-0" />
+        )}
         <span className="truncate">{summary}</span>
         <ChevronRightIcon
           className={cn(
