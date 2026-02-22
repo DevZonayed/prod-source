@@ -7,8 +7,6 @@ on:
 
 env:
     FREESTYLE_API_KEY: ${{ secrets.FREESTYLE_API_KEY }}
-    NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.NEXT_PUBLIC_POSTHOG_KEY }}
-    NEXT_PUBLIC_POSTHOG_HOST: ${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}
 
 jobs:
     deploy:
