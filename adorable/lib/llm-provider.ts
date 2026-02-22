@@ -1,5 +1,8 @@
-import { anthropic } from "@ai-sdk/anthropic";
-import { openai, type OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import {
+  createOpenAI,
+  type OpenAIResponsesProviderOptions,
+} from "@ai-sdk/openai";
 import {
   stepCountIs,
   streamText,
@@ -8,11 +11,11 @@ import {
   convertToModelMessages,
 } from "ai";
 
-type LlmProviderName = "openai" | "claude";
+type LlmProviderName = "openai" | "anthropic";
 
-const getProviderName = (): LlmProviderName => {
-  const value = process.env["LLM_PROVIDER"]?.toLowerCase().trim();
-  if (value === "claude") return "claude";
+const getProviderName = (override?: string): LlmProviderName => {
+  const value = (override ?? process.env["LLM_PROVIDER"])?.toLowerCase().trim();
+  if (value === "anthropic" || value === "claude") return "anthropic";
   return "openai";
 };
 
@@ -20,6 +23,8 @@ type StreamLlmResponseParams = {
   system: string;
   messages: UIMessage[];
   tools: ToolSet;
+  apiKey?: string;
+  providerOverride?: string;
 };
 
 type StreamLlmResponseResult = {
@@ -31,14 +36,17 @@ export const streamLlmResponse = async ({
   system,
   messages,
   tools,
+  apiKey,
+  providerOverride,
 }: StreamLlmResponseParams): Promise<StreamLlmResponseResult> => {
-  const provider = getProviderName();
+  const provider = getProviderName(providerOverride);
   const modelMessages = await convertToModelMessages(messages);
 
   if (provider === "openai") {
+    const openaiProvider = apiKey ? createOpenAI({ apiKey }) : createOpenAI({});
     const result = streamText({
       system,
-      model: openai.responses("gpt-5.2-codex"),
+      model: openaiProvider.responses("gpt-5.2-codex"),
       messages: modelMessages,
       tools,
       providerOptions: {
@@ -55,9 +63,12 @@ export const streamLlmResponse = async ({
     };
   }
 
+  const anthropicProvider = apiKey
+    ? createAnthropic({ apiKey })
+    : createAnthropic({});
   const result = streamText({
     system,
-    model: anthropic("claude-sonnet-4-20250514"),
+    model: anthropicProvider("claude-sonnet-4-20250514"),
     messages: modelMessages,
     tools,
     stopWhen: stepCountIs(100),
