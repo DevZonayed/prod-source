@@ -152,7 +152,12 @@ const ThreadWelcome: FC = () => {
             <p className="mb-3 text-center text-xs font-medium text-muted-foreground/50">
               Your projects
             </p>
-            <div className="grid grid-cols-2 gap-2">
+            <div
+              className={cn(
+                "grid gap-2",
+                repos.length === 1 ? "grid-cols-1" : "grid-cols-2",
+              )}
+            >
               {repos.map((repo) => (
                 <button
                   key={repo.id}
