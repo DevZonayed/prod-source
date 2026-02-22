@@ -1,18 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import {
-  RepoSidebar,
-  type RepoDeployment,
-  type RepoItem,
-  type RepoVmInfo,
-} from "@/components/assistant-ui/repo-sidebar";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import type { RepoDeployment, RepoItem, RepoVmInfo } from "@/lib/repo-types";
+import { ProjectConversationsProvider } from "@/lib/project-conversations-context";
+import { ReposProvider } from "@/lib/repos-context";
+import { PublishDialog } from "@/components/assistant-ui/publish-dialog";
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
+  ChevronLeftIcon,
   Loader2Icon,
   PlusIcon,
   RotateCwIcon,
@@ -210,13 +208,8 @@ export function RepoWorkspaceShell({
     };
   }, []);
 
-  const handleCreateRepo = useCallback(async () => {
-    window.dispatchEvent(new Event("adorable:go-home"));
-    router.push("/");
-  }, [router]);
-
-  const handleCreateConversation = useCallback(
-    async (nextRepoId: string) => {
+  const handleSelectProject = useCallback(
+    (nextRepoId: string) => {
       router.push(`/${nextRepoId}`);
     },
     [router],
@@ -227,11 +220,17 @@ export function RepoWorkspaceShell({
     : null;
   const showWorkspacePanel = Boolean(repoId);
 
-  const onSelectConversation = useCallback(
-    (nextRepoId: string, conversationId: string) => {
-      router.push(`/${nextRepoId}/${conversationId}`);
-    },
-    [router],
+  const conversationsContextValue = useMemo(
+    () => ({
+      repoId,
+      conversations: selectedRepo?.conversations ?? [],
+      onSelectConversation: (conversationId: string) => {
+        if (repoId) {
+          router.push(`/${repoId}/${conversationId}`);
+        }
+      },
+    }),
+    [repoId, selectedRepo?.conversations, router],
   );
 
   const onSetProductionDomain = useCallback(
@@ -277,34 +276,79 @@ export function RepoWorkspaceShell({
     [loadRepos],
   );
 
+  const reposContextValue = useMemo(
+    () => ({
+      repos,
+      onSelectProject: handleSelectProject,
+    }),
+    [repos, handleSelectProject],
+  );
+
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
   return (
-    <SidebarProvider
-      defaultOpen={true}
-      className="h-full min-h-0 overflow-hidden"
-    >
-      <div className="flex h-full min-h-0 w-full overflow-hidden">
-        <RepoSidebar
-          repos={repos}
-          selectedRepoId={repoId}
-          selectedConversationId={selectedConversationId}
-          onSelectConversation={onSelectConversation}
-          onCreateRepo={handleCreateRepo}
-          onCreateConversation={handleCreateConversation}
-          onSetProductionDomain={onSetProductionDomain}
-          onPromoteDeployment={onPromoteDeployment}
-          collapsible="icon"
-        />
-        <SidebarInset>
+    <ReposProvider value={reposContextValue}>
+      <ProjectConversationsProvider value={conversationsContextValue}>
+        <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
+          {/* Unified top bar */}
+          {repoId && selectedRepo && (
+            <div
+              className="grid h-11 shrink-0 border-b bg-background transition-[grid-template-columns] duration-500 ease-in-out"
+              style={{
+                gridTemplateColumns: showWorkspacePanel ? "2fr 3fr" : "1fr 0fr",
+              }}
+            >
+              {/* Left: back button */}
+              <div className="flex items-center px-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.dispatchEvent(new Event("adorable:go-home"));
+                    router.push("/");
+                  }}
+                  className="flex items-center gap-1 rounded-md px-1.5 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                  title="Back to projects"
+                >
+                  <ChevronLeftIcon className="size-3.5" />
+                  <span className="text-sm font-medium">
+                    {selectedRepo.name}
+                  </span>
+                </button>
+              </div>
+
+              {/* Right: browser controls + publish */}
+              <div
+                className={cn(
+                  "flex items-center gap-1 px-2 transition-opacity duration-500",
+                  showWorkspacePanel
+                    ? "opacity-100"
+                    : "pointer-events-none opacity-0",
+                )}
+              >
+                {showWorkspacePanel && selectedRepo.vm?.previewUrl && (
+                  <BrowserControls
+                    previewUrl={selectedRepo.vm.previewUrl}
+                    iframeRef={iframeRef}
+                    repo={selectedRepo}
+                    onSetProductionDomain={onSetProductionDomain}
+                    onPromoteDeployment={onPromoteDeployment}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Main content grid */}
           <div
-            className="grid h-full min-h-0 transition-[grid-template-columns] duration-500 ease-in-out"
+            className="grid min-h-0 flex-1 pb-2 transition-[grid-template-columns] duration-500 ease-in-out"
             style={{
-              gridTemplateColumns: showWorkspacePanel ? "1fr 1fr" : "1fr 0fr",
+              gridTemplateColumns: showWorkspacePanel ? "2fr 3fr" : "1fr 0fr",
             }}
           >
             <div className="relative min-w-0 overflow-hidden">{children}</div>
             <div
               className={cn(
-                "min-w-0 overflow-hidden border-l transition-opacity duration-500",
+                "min-w-0 overflow-hidden transition-opacity duration-500",
                 showWorkspacePanel
                   ? "opacity-100"
                   : "pointer-events-none opacity-0",
@@ -312,15 +356,18 @@ export function RepoWorkspaceShell({
             >
               {showWorkspacePanel &&
                 (selectedRepo?.vm?.previewUrl ? (
-                  <AppPreview metadata={selectedRepo.vm} />
+                  <AppPreview
+                    metadata={selectedRepo.vm}
+                    iframeRef={iframeRef}
+                  />
                 ) : (
                   <PreviewPlaceholder />
                 ))}
             </div>
           </div>
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
+        </div>
+      </ProjectConversationsProvider>
+    </ReposProvider>
   );
 }
 
@@ -381,12 +428,17 @@ function PreviewPlaceholder() {
   );
 }
 
-function AppPreview({ metadata }: { metadata: RepoVmInfo }) {
+function AppPreview({
+  metadata,
+  iframeRef,
+}: {
+  metadata: RepoVmInfo;
+  iframeRef: React.RefObject<HTMLIFrameElement | null>;
+}) {
   const [extraTerminals, setExtraTerminals] = useState<TerminalTab[]>([]);
   const [activeTab, setActiveTab] = useState("dev-server");
   const [counter, setCounter] = useState(1);
   const [iframeLoaded, setIframeLoaded] = useState(false);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     setIframeLoaded(false);
@@ -433,10 +485,6 @@ function AppPreview({ metadata }: { metadata: RepoVmInfo }) {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="relative flex h-[70%] min-h-0 flex-col">
-        <BrowserToolbar
-          previewUrl={metadata.previewUrl}
-          iframeRef={iframeRef}
-        />
         <div className="relative min-h-0 flex-1">
           {!iframeLoaded && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
@@ -528,12 +576,18 @@ function AppPreview({ metadata }: { metadata: RepoVmInfo }) {
   );
 }
 
-function BrowserToolbar({
+function BrowserControls({
   previewUrl,
   iframeRef,
+  repo,
+  onSetProductionDomain,
+  onPromoteDeployment,
 }: {
   previewUrl: string;
   iframeRef: React.RefObject<HTMLIFrameElement | null>;
+  repo: RepoItem;
+  onSetProductionDomain: (repoId: string, domain: string) => Promise<void>;
+  onPromoteDeployment: (repoId: string, deploymentId: string) => Promise<void>;
 }) {
   const [urlValue, setUrlValue] = useState(() => {
     try {
@@ -587,7 +641,7 @@ function BrowserToolbar({
   };
 
   return (
-    <div className="flex h-10 shrink-0 items-center gap-1 border-b bg-muted/20 px-2">
+    <>
       <button
         type="button"
         onClick={handleBack}
@@ -627,6 +681,13 @@ function BrowserToolbar({
           aria-label="URL path"
         />
       </form>
-    </div>
+      <div className="ml-1.5">
+        <PublishDialog
+          repo={repo}
+          onSetProductionDomain={onSetProductionDomain}
+          onPromoteDeployment={onPromoteDeployment}
+        />
+      </div>
+    </>
   );
 }

@@ -53,6 +53,8 @@ import {
 } from "lucide-react";
 import { type FC } from "react";
 import { usePathname } from "next/navigation";
+import { useProjectConversations } from "@/lib/project-conversations-context";
+import { useRepos } from "@/lib/repos-context";
 
 export const Thread: FC = () => {
   return (
@@ -101,6 +103,12 @@ const ThreadScrollToBottom: FC = () => {
 const ThreadWelcome: FC = () => {
   const pathname = usePathname();
   const isHome = pathname === "/";
+  const { conversations, onSelectConversation, repoId } =
+    useProjectConversations();
+  const { repos, onSelectProject } = useRepos();
+
+  const hasConversations = repoId && conversations.length > 0;
+  const hasProjects = isHome && repos.length > 0;
 
   return (
     <div className="aui-thread-welcome-root mx-auto my-auto flex w-full max-w-(--thread-max-width) grow flex-col">
@@ -132,16 +140,69 @@ const ThreadWelcome: FC = () => {
             />
           </svg>
           <h1 className="aui-thread-welcome-message-inner animate-in text-3xl font-semibold tracking-tight duration-300 fade-in slide-in-from-bottom-2">
-            {isHome
-              ? "What do you want to build?"
-              : "Continue building this project"}
+            {isHome ? "What do you want to build?" : ""}
           </h1>
-          <p className="aui-thread-welcome-message-inner mt-2 animate-in text-base text-muted-foreground delay-75 duration-300 fade-in slide-in-from-bottom-2">
-            {isHome
-              ? "Start a new project or ask for anything to get going."
-              : "Ask for edits, new features, fixes, or deployments."}
-          </p>
         </div>
+
+        {/* Projects on home screen */}
+        {hasProjects && (
+          <div className="mt-8 w-full max-w-md animate-in delay-100 duration-300 fade-in slide-in-from-bottom-2">
+            <p className="mb-3 text-center text-xs font-medium text-muted-foreground/50">
+              Your projects
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {repos.map((repo) => (
+                <button
+                  key={repo.id}
+                  type="button"
+                  onClick={() => onSelectProject(repo.id)}
+                  className="flex flex-col items-start rounded-xl border border-border/50 bg-card p-4 text-left transition-colors hover:border-border hover:bg-accent"
+                >
+                  <span className="w-full truncate text-sm font-medium text-foreground">
+                    {repo.name}
+                  </span>
+                  <span className="mt-1 text-xs text-muted-foreground/60">
+                    {repo.conversations.length} conversation
+                    {repo.conversations.length !== 1 ? "s" : ""}
+                    {repo.deployments.length > 0 && (
+                      <>
+                        {" "}
+                        · {repo.deployments.length} deployment
+                        {repo.deployments.length !== 1 ? "s" : ""}
+                      </>
+                    )}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Previous conversations */}
+        {hasConversations && (
+          <div className="mt-8 w-full max-w-sm animate-in delay-100 duration-300 fade-in slide-in-from-bottom-2">
+            <p className="mb-2 text-center text-xs font-medium text-muted-foreground/50">
+              Previous conversations
+            </p>
+            <div className="space-y-0.5">
+              {conversations.map((conversation) => {
+                const title = conversation.title?.trim();
+                return (
+                  <button
+                    key={conversation.id}
+                    type="button"
+                    onClick={() => onSelectConversation(conversation.id)}
+                    className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <span className="truncate">
+                      {title || "Untitled conversation"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
