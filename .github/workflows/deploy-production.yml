@@ -10,7 +10,7 @@ env:
 
 jobs:
     deploy:
-        name: Deploy production at https://www.freestyle.sh
+        name: Deploy production
         runs-on: ubuntu-latest
         defaults:
             run:
