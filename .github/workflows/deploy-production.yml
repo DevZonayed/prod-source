@@ -25,6 +25,6 @@ jobs:
             - run: |
                   npx freestyle-sh deploy \
                     --build \
-                    --domain=adorable.style.dev \
+                    --domain=adorable-demo.style.dev \
                     --timeout=100000000 \
                     --env FREESTYLE_API_KEY=${{ secrets.FREESTYLE_API_KEY }} \
