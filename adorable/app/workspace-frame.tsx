@@ -78,6 +78,27 @@ export function WorkspaceFrame({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  useEffect(() => {
+    const handleGoToRepo = (event: Event) => {
+      const customEvent = event as CustomEvent<{ repoId: string }>;
+      const detail = customEvent.detail;
+      if (!detail?.repoId) return;
+      setActiveRepoId(detail.repoId);
+      setActiveConversationId(null);
+    };
+
+    window.addEventListener(
+      "adorable:go-to-repo",
+      handleGoToRepo as EventListener,
+    );
+    return () => {
+      window.removeEventListener(
+        "adorable:go-to-repo",
+        handleGoToRepo as EventListener,
+      );
+    };
+  }, []);
+
   const effectiveRepoId = routeRepoId ?? activeRepoId;
   const effectiveConversationId = routeConversationId ?? activeConversationId;
 

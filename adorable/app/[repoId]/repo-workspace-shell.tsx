@@ -303,15 +303,28 @@ export function RepoWorkspaceShell({
                 <button
                   type="button"
                   onClick={() => {
-                    window.dispatchEvent(new Event("adorable:go-home"));
-                    router.push("/");
+                    if (selectedConversationId) {
+                      // On conversation page → go back to repo page
+                      window.dispatchEvent(
+                        new CustomEvent("adorable:go-to-repo", {
+                          detail: { repoId },
+                        }),
+                      );
+                      router.push(`/${repoId}`);
+                    } else {
+                      // On repo page → go back to home
+                      window.dispatchEvent(new Event("adorable:go-home"));
+                      router.push("/");
+                    }
                   }}
                   className="flex items-center gap-1 rounded-md px-1.5 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                  title="Back to projects"
+                  title={
+                    selectedConversationId ? "All conversations" : "All apps"
+                  }
                 >
                   <ChevronLeftIcon className="size-3.5" />
                   <span className="text-sm font-medium">
-                    {selectedRepo.name}
+                    {selectedConversationId ? "All Conversations" : "All Apps"}
                   </span>
                 </button>
               </div>

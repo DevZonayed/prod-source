@@ -181,7 +181,7 @@ const ThreadWelcome: FC = () => {
         {/* Previous conversations */}
         {hasConversations && (
           <div className="mt-8 w-full max-w-sm animate-in delay-100 duration-300 fade-in slide-in-from-bottom-2">
-            <p className="mb-2 text-center text-xs font-medium text-muted-foreground/50">
+            <p className="mb-2 px-3 text-xs font-medium text-muted-foreground/50">
               Previous conversations
             </p>
             <div className="space-y-0.5">

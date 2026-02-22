@@ -101,6 +101,33 @@ export const Assistant = ({
     };
   }, []);
 
+  useEffect(() => {
+    const handleGoToRepo = (event: Event) => {
+      const customEvent = event as CustomEvent<{ repoId: string }>;
+      const detail = customEvent.detail;
+      if (!detail?.repoId) return;
+
+      setSeedMessages(EMPTY_MESSAGES);
+      setLocalRepoId(detail.repoId);
+      setLocalConversationId(null);
+      activeRepoIdRef.current = detail.repoId;
+      activeConversationIdRef.current = null;
+      chatSessionIdRef.current = `repo:${detail.repoId}:draft:${Date.now()}`;
+      setRuntimeVersion((version) => version + 1);
+    };
+
+    window.addEventListener(
+      "adorable:go-to-repo",
+      handleGoToRepo as EventListener,
+    );
+    return () => {
+      window.removeEventListener(
+        "adorable:go-to-repo",
+        handleGoToRepo as EventListener,
+      );
+    };
+  }, []);
+
   const ensureActiveConversation = useCallback(
     async (requestedRepoName?: string, requestedConversationTitle?: string) => {
       const activeRepoId = activeRepoIdRef.current;
