@@ -452,6 +452,13 @@ function AppPreview({
   const [activeTab, setActiveTab] = useState("dev-server");
   const [counter, setCounter] = useState(1);
   const [iframeLoaded, setIframeLoaded] = useState(false);
+  const [loadedTerminals, setLoadedTerminals] = useState<Set<string>>(
+    new Set(),
+  );
+
+  const markTerminalLoaded = useCallback((id: string) => {
+    setLoadedTerminals((prev) => new Set(prev).add(id));
+  }, []);
 
   useEffect(() => {
     setIframeLoaded(false);
@@ -498,7 +505,7 @@ function AppPreview({
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="relative flex h-[70%] min-h-0 flex-col">
-        <div className="relative min-h-0 flex-1">
+        <div className="relative min-h-0 flex-1 bg-muted/30">
           {!iframeLoaded && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
               <div className="flex flex-col items-center gap-3">
@@ -569,13 +576,17 @@ function AppPreview({
           )}
         </div>
 
-        <div className="relative min-h-0 flex-1">
+        <div className="relative min-h-0 flex-1 bg-[rgb(30,30,30)]">
           {allTabs.map((tab) => (
             <iframe
               key={tab.id}
               src={tab.url}
-              className="absolute inset-0 h-full w-full"
+              className={cn(
+                "absolute inset-0 h-full w-full transition-opacity duration-500",
+                loadedTerminals.has(tab.id) ? "opacity-100" : "opacity-0",
+              )}
               style={{ display: activeTab === tab.id ? "block" : "none" }}
+              onLoad={() => markTerminalLoaded(tab.id)}
             />
           ))}
           {allTabs.length === 0 && (
