@@ -114,31 +114,33 @@ const ThreadWelcome: FC = () => {
     <div className="aui-thread-welcome-root mx-auto my-auto flex w-full max-w-(--thread-max-width) grow flex-col">
       <div className="aui-thread-welcome-center flex w-full grow flex-col items-center justify-center">
         <div className="aui-thread-welcome-message flex flex-col items-center justify-center px-4 text-center">
-          <svg
-            viewBox="0 0 347 280"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            className="mb-6 h-12 w-auto animate-in duration-500 fade-in"
-          >
-            <path
-              d="M70 267V235.793C37.4932 229.296 13 200.594 13 166.177C13 134.93 33.1885 108.399 61.2324 98.9148C61.9277 51.3467 100.705 13 148.438 13C183.979 13 214.554 34.2582 228.143 64.7527C234.182 63.4301 240.454 62.733 246.89 62.733C295.058 62.733 334.105 101.781 334.105 149.949C334.105 182.845 315.893 211.488 289 226.343V267"
-              className="stroke-foreground/15"
-              strokeWidth="25"
-              strokeLinecap="round"
-            />
-            <path
-              d="M146 237V267"
-              className="stroke-foreground/15"
-              strokeWidth="25"
-              strokeLinecap="round"
-            />
-            <path
-              d="M215 237V267"
-              className="stroke-foreground/15"
-              strokeWidth="25"
-              strokeLinecap="round"
-            />
-          </svg>
+          {isHome && (
+            <svg
+              viewBox="0 0 347 280"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className="mb-6 h-12 w-auto animate-in duration-500 fade-in"
+            >
+              <path
+                d="M70 267V235.793C37.4932 229.296 13 200.594 13 166.177C13 134.93 33.1885 108.399 61.2324 98.9148C61.9277 51.3467 100.705 13 148.438 13C183.979 13 214.554 34.2582 228.143 64.7527C234.182 63.4301 240.454 62.733 246.89 62.733C295.058 62.733 334.105 101.781 334.105 149.949C334.105 182.845 315.893 211.488 289 226.343V267"
+                className="stroke-foreground/15"
+                strokeWidth="25"
+                strokeLinecap="round"
+              />
+              <path
+                d="M146 237V267"
+                className="stroke-foreground/15"
+                strokeWidth="25"
+                strokeLinecap="round"
+              />
+              <path
+                d="M215 237V267"
+                className="stroke-foreground/15"
+                strokeWidth="25"
+                strokeLinecap="round"
+              />
+            </svg>
+          )}
           <h1 className="aui-thread-welcome-message-inner animate-in text-3xl font-semibold tracking-tight duration-300 fade-in slide-in-from-bottom-2">
             {isHome ? "What do you want to build?" : ""}
           </h1>
@@ -180,11 +182,11 @@ const ThreadWelcome: FC = () => {
 
         {/* Previous conversations */}
         {hasConversations && (
-          <div className="mt-8 w-full max-w-sm animate-in delay-100 duration-300 fade-in slide-in-from-bottom-2">
+          <div className="mt-8 w-full max-w-(--thread-max-width) animate-in delay-100 duration-300 fade-in slide-in-from-bottom-2">
             <p className="mb-2 px-3 text-xs font-medium text-muted-foreground/50">
               Previous conversations
             </p>
-            <div className="space-y-0.5">
+            <div className="divide-y divide-border/50">
               {conversations.map((conversation) => {
                 const title = conversation.title?.trim();
                 return (
@@ -192,7 +194,7 @@ const ThreadWelcome: FC = () => {
                     key={conversation.id}
                     type="button"
                     onClick={() => onSelectConversation(conversation.id)}
-                    className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    className="flex w-full items-center rounded-md px-3 py-2.5 text-left text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
                   >
                     <span className="truncate">
                       {title || "Untitled conversation"}
