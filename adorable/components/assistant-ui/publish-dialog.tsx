@@ -7,12 +7,18 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { GlobeIcon, Loader2Icon, RocketIcon, SettingsIcon } from "lucide-react";
+import {
+  CheckCircle2Icon,
+  ExternalLinkIcon,
+  GlobeIcon,
+  Loader2Icon,
+  PencilIcon,
+  RocketIcon,
+} from "lucide-react";
 import type { RepoItem } from "@/lib/repo-types";
 
 const formatRelativeTime = (dateString: string) => {
@@ -43,7 +49,47 @@ export function PublishDialog({
 }) {
   const [isPromotingId, setIsPromotingId] = React.useState<string | null>(null);
 
+  /* Domain editing – inline, no nested dialog */
+  const [isEditingDomain, setIsEditingDomain] = React.useState(false);
+  const [domainInput, setDomainInput] = React.useState("");
+  const [isSavingDomain, setIsSavingDomain] = React.useState(false);
+  const [domainError, setDomainError] = React.useState<string | null>(null);
+
+  const hasDomain = !!repo.productionDomain;
   const items = repo.deployments;
+
+  const latestLive = items.find((d) => d.state === "live" && d.deploymentId);
+  const hasLiveNotPromoted =
+    latestLive && latestLive.deploymentId !== repo.productionDeploymentId;
+
+  const startEditDomain = () => {
+    setDomainInput(repo.productionDomain ?? "");
+    setDomainError(null);
+    setIsEditingDomain(true);
+  };
+
+  const cancelEditDomain = () => {
+    setIsEditingDomain(false);
+    setDomainError(null);
+  };
+
+  const saveDomain = async () => {
+    const nextDomain = domainInput.trim().toLowerCase();
+    if (!nextDomain.endsWith(".style.dev")) {
+      setDomainError("Domain must end in .style.dev");
+      return;
+    }
+    setDomainError(null);
+    setIsSavingDomain(true);
+    try {
+      await onSetProductionDomain(repo.id, nextDomain);
+      setIsEditingDomain(false);
+    } catch (e) {
+      setDomainError(e instanceof Error ? e.message : "Failed to save domain");
+    } finally {
+      setIsSavingDomain(false);
+    }
+  };
 
   const handlePromote = async (deploymentId: string) => {
     setIsPromotingId(deploymentId);
@@ -57,7 +103,11 @@ export function PublishDialog({
   };
 
   return (
-    <Dialog>
+    <Dialog
+      onOpenChange={(open) => {
+        if (!open) cancelEditDomain();
+      }}
+    >
       <DialogTrigger asChild>
         <button
           type="button"
@@ -71,55 +121,172 @@ export function PublishDialog({
         <DialogHeader>
           <DialogTitle>Publish</DialogTitle>
           <DialogDescription>
-            Manage your production domain and deployments.
+            Every commit gets a staging deployment automatically. Publish
+            promotes a deployment to your production domain.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 pt-1">
-          {/* Domain section */}
+          {/* ---- Step 1: Domain ---- */}
           <div>
-            <div className="flex items-center justify-between pb-2">
-              <span className="text-[11px] font-medium tracking-wider text-muted-foreground/50 uppercase">
-                Domain
+            <div className="flex items-center gap-2 pb-2">
+              <span
+                className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${hasDomain ? "bg-emerald-500/15 text-emerald-500" : "bg-muted text-muted-foreground"}`}
+              >
+                {hasDomain ? <CheckCircle2Icon className="size-3.5" /> : "1"}
               </span>
-              <ConfigureDomainDialog
-                repo={repo}
-                onSetProductionDomain={onSetProductionDomain}
-              />
+              <span className="text-sm font-medium">
+                {hasDomain ? "Domain configured" : "Set up your domain"}
+              </span>
             </div>
-            <div>
-              {repo.productionDomain ? (
+
+            {isEditingDomain ? (
+              <div className="space-y-2 pl-7">
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={domainInput}
+                    onChange={(e) => {
+                      setDomainInput(e.target.value);
+                      setDomainError(null);
+                    }}
+                    placeholder="my-app.style.dev"
+                    className="h-8 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void saveDomain();
+                      if (e.key === "Escape") cancelEditDomain();
+                    }}
+                    autoFocus
+                  />
+                  <Button
+                    size="sm"
+                    className="h-8 shrink-0"
+                    onClick={saveDomain}
+                    disabled={isSavingDomain}
+                  >
+                    {isSavingDomain ? (
+                      <Loader2Icon className="size-3.5 animate-spin" />
+                    ) : (
+                      "Save"
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 shrink-0"
+                    onClick={cancelEditDomain}
+                    disabled={isSavingDomain}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+                {domainError && (
+                  <p className="text-[13px] text-destructive">{domainError}</p>
+                )}
+              </div>
+            ) : hasDomain ? (
+              <div className="flex items-center gap-2 pl-7">
                 <a
                   href={`https://${repo.productionDomain}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-1.5 rounded-md py-1 text-sm text-foreground transition-colors hover:underline"
+                  className="flex items-center gap-1.5 text-sm text-foreground transition-colors hover:underline"
                 >
                   <GlobeIcon className="size-3.5 shrink-0 text-emerald-500" />
                   <span className="truncate">{repo.productionDomain}</span>
+                  <ExternalLinkIcon className="size-3 shrink-0 text-muted-foreground/40" />
                 </a>
-              ) : (
-                <p className="py-1 text-sm text-muted-foreground/40">
-                  Not configured
+                <button
+                  type="button"
+                  onClick={startEditDomain}
+                  className="ml-1 inline-flex size-6 items-center justify-center rounded text-muted-foreground/40 transition-colors hover:bg-muted hover:text-foreground"
+                  title="Edit domain"
+                >
+                  <PencilIcon className="size-3" />
+                </button>
+              </div>
+            ) : (
+              <div className="pl-7">
+                <p className="mb-2 text-[13px] text-muted-foreground/60">
+                  Choose a <span className="font-medium">.style.dev</span>{" "}
+                  subdomain for your app.
                 </p>
-              )}
-            </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  onClick={startEditDomain}
+                >
+                  <GlobeIcon className="size-3.5" />
+                  Set domain
+                </Button>
+              </div>
+            )}
           </div>
 
-          {/* Deployments section */}
+          {/* ---- Step 2: Deploy ---- */}
           <div>
-            <div className="pb-2">
-              <span className="text-[11px] font-medium tracking-wider text-muted-foreground/50 uppercase">
-                Deployments
+            <div className="flex items-center gap-2 pb-2">
+              <span
+                className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${repo.productionDeploymentId ? "bg-emerald-500/15 text-emerald-500" : "bg-muted text-muted-foreground"}`}
+              >
+                {repo.productionDeploymentId ? (
+                  <CheckCircle2Icon className="size-3.5" />
+                ) : (
+                  "2"
+                )}
+              </span>
+              <span className="text-sm font-medium">
+                {repo.productionDeploymentId
+                  ? "Deployment live"
+                  : "Promote a deployment"}
               </span>
             </div>
 
-            {items.length === 0 ? (
-              <div className="py-2 text-sm text-muted-foreground/40">
-                No deployments yet
+            {/* Promote banner — shows when there's a newer live deployment not yet in prod */}
+            {hasDomain && hasLiveNotPromoted && latestLive.deploymentId && (
+              <div className="mb-3 ml-7 flex items-center justify-between gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {latestLive.commitMessage}
+                  </p>
+                  <p className="text-xs text-muted-foreground/60">
+                    {formatRelativeTime(latestLive.commitDate)} · Ready to
+                    publish
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  className="h-8 shrink-0 bg-emerald-600 text-white hover:bg-emerald-700"
+                  onClick={() => void handlePromote(latestLive.deploymentId!)}
+                  disabled={isPromotingId === latestLive.deploymentId}
+                >
+                  {isPromotingId === latestLive.deploymentId ? (
+                    <>
+                      <Loader2Icon className="size-3.5 animate-spin" />
+                      Publishing…
+                    </>
+                  ) : (
+                    <>
+                      <RocketIcon className="size-3.5" />
+                      Publish
+                    </>
+                  )}
+                </Button>
               </div>
+            )}
+
+            {!hasDomain && items.length > 0 && (
+              <p className="mb-2 pl-7 text-[13px] text-muted-foreground/60">
+                Set up a domain first, then you can publish a deployment.
+              </p>
+            )}
+
+            {items.length === 0 ? (
+              <p className="py-1 pl-7 text-[13px] text-muted-foreground/40">
+                No deployments yet. Send a message to create your first build.
+              </p>
             ) : (
-              <div className="max-h-64 space-y-px overflow-y-auto">
+              <div className="max-h-48 space-y-px overflow-y-auto pl-7">
                 {items.map((entry) => {
                   const isProduction =
                     !!entry.deploymentId &&
@@ -127,20 +294,17 @@ export function PublishDialog({
                   const isPromoting = isPromotingId === entry.deploymentId;
                   const canPromote =
                     !!entry.deploymentId &&
-                    !!repo.productionDomain &&
+                    hasDomain &&
                     entry.state === "live" &&
                     !isProduction;
 
                   return (
-                    <a
+                    <div
                       key={`${entry.commitSha}-${entry.url}`}
-                      href={entry.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-start gap-2 rounded-md px-2 py-2 transition-colors hover:bg-accent"
+                      className="flex items-center gap-2 rounded-md px-2 py-2 transition-colors hover:bg-accent"
                     >
                       {/* Status dot */}
-                      <span className="mt-[5px] flex size-3.5 shrink-0 items-center justify-center">
+                      <span className="flex size-3.5 shrink-0 items-center justify-center">
                         {entry.state === "deploying" ? (
                           <Loader2Icon className="size-3 animate-spin text-amber-400" />
                         ) : entry.state === "live" ? (
@@ -154,150 +318,53 @@ export function PublishDialog({
 
                       {/* Text */}
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm leading-snug text-foreground">
+                        <a
+                          href={entry.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block truncate text-sm leading-snug text-foreground hover:underline"
+                        >
                           {entry.commitMessage}
-                        </div>
+                        </a>
                         <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground/60">
                           <span>{formatRelativeTime(entry.commitDate)}</span>
                           {isProduction && (
                             <>
                               <span className="opacity-40">·</span>
                               <span className="font-medium text-emerald-400">
-                                prod
+                                production
                               </span>
-                            </>
-                          )}
-                          {canPromote && (
-                            <>
-                              <span className="opacity-40">·</span>
-                              <button
-                                type="button"
-                                className="text-xs text-muted-foreground/60 underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:opacity-50"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  if (!entry.deploymentId) return;
-                                  void handlePromote(entry.deploymentId);
-                                }}
-                                disabled={isPromoting}
-                              >
-                                {isPromoting ? "promoting…" : "promote"}
-                              </button>
                             </>
                           )}
                         </div>
                       </div>
-                    </a>
+
+                      {/* Promote button */}
+                      {canPromote && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 shrink-0 px-2 text-xs text-muted-foreground hover:text-foreground"
+                          onClick={() => {
+                            if (!entry.deploymentId) return;
+                            void handlePromote(entry.deploymentId);
+                          }}
+                          disabled={isPromoting}
+                        >
+                          {isPromoting ? (
+                            <Loader2Icon className="size-3 animate-spin" />
+                          ) : (
+                            "Publish"
+                          )}
+                        </Button>
+                      )}
+                    </div>
                   );
                 })}
               </div>
             )}
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Domain config dialog (nested)                                      */
-/* ------------------------------------------------------------------ */
-
-function ConfigureDomainDialog({
-  repo,
-  onSetProductionDomain,
-}: {
-  repo: RepoItem;
-  onSetProductionDomain: (repoId: string, domain: string) => Promise<void>;
-}) {
-  const [open, setOpen] = React.useState(false);
-  const [domainInput, setDomainInput] = React.useState("");
-  const [isSaving, setIsSaving] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (open) {
-      setDomainInput(repo.productionDomain ?? "");
-      setError(null);
-    }
-  }, [open, repo.productionDomain]);
-
-  const handleSave = async () => {
-    const nextDomain = domainInput.trim().toLowerCase();
-    if (!nextDomain.endsWith(".style.dev")) {
-      setError("Domain must end in .style.dev");
-      return;
-    }
-
-    setError(null);
-    setIsSaving(true);
-    try {
-      await onSetProductionDomain(repo.id, nextDomain);
-      setOpen(false);
-    } catch (saveError) {
-      setError(
-        saveError instanceof Error
-          ? saveError.message
-          : "Failed to save domain",
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex size-5 items-center justify-center rounded text-muted-foreground/40 transition-colors hover:text-foreground"
-          title="Configure production domain"
-        >
-          <SettingsIcon className="size-3" />
-        </button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Production Domain</DialogTitle>
-          <DialogDescription>
-            Set a custom <span className="font-medium">.style.dev</span> domain
-            for your production deployments.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-1.5">
-          <Input
-            value={domainInput}
-            onChange={(event) => {
-              setDomainInput(event.target.value);
-              setError(null);
-            }}
-            placeholder="my-app.style.dev"
-            onKeyDown={(event) => {
-              if (event.key === "Enter") void handleSave();
-            }}
-          />
-          {error && <p className="text-[13px] text-destructive">{error}</p>}
-        </div>
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => setOpen(false)}
-            disabled={isSaving}
-          >
-            Cancel
-          </Button>
-          <Button type="button" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? (
-              <>
-                <Loader2Icon className="size-4 animate-spin" />
-                Saving…
-              </>
-            ) : (
-              "Save"
-            )}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
