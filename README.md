@@ -10,7 +10,6 @@ An open-source AI app builder. Describe what you want, and Adorable builds it fo
 - **Live preview & terminal** — See your app update in real time with an embedded browser and terminal
 - **One-click publish** — Deploy to a production domain with a single click
 - **Persistent projects** — Every project is backed by a git repo; conversations and history are preserved across sessions
-- **VM health management** — VMs are automatically checked, restarted, or recreated when you revisit a project
 
 ## Tech Stack
 

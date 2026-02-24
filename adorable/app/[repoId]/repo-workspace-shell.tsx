@@ -57,7 +57,6 @@ export function RepoWorkspaceShell({
 
   const [repos, setRepos] = useState<RepoItem[]>([]);
   const [threadIsRunning, setThreadIsRunning] = useState(false);
-  const [vmReady, setVmReady] = useState(false);
   const hasDeployingRepo = repos.some((repo) =>
     repo.deployments.some((deployment) => deployment.state === "deploying"),
   );
@@ -112,46 +111,6 @@ export function RepoWorkspaceShell({
     if (!repoId) return;
     loadRepos();
   }, [loadRepos, repoId]);
-
-  // VM health check – fire once when a repo page loads.
-  // Blocks iframe rendering until the VM is confirmed healthy.
-  useEffect(() => {
-    if (!repoId) return;
-    setVmReady(false);
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const res = await fetch(`/api/repos/${repoId}/vm-health`, {
-          method: "POST",
-        });
-        if (!res.ok || cancelled) return;
-
-        const data = (await res.json()) as {
-          status: string;
-          vmId?: string;
-          vm?: RepoVmInfo;
-        };
-
-        // If the VM was recreated, update the repo's VM info so
-        // preview/terminal URLs refresh without a full reload.
-        if (data.status === "recreated" && data.vm) {
-          setRepos((prev) =>
-            prev.map((r) => (r.id === repoId ? { ...r, vm: data.vm! } : r)),
-          );
-        }
-
-        if (!cancelled) setVmReady(true);
-      } catch {
-        // Even on error, allow rendering so the user isn't stuck
-        if (!cancelled) setVmReady(true);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [repoId]);
 
   useEffect(() => {
     if (!threadIsRunning && !hasDeployingRepo) return;
@@ -404,7 +363,7 @@ export function RepoWorkspaceShell({
                     <span className="text-sm font-medium">Chat</span>
                   </button>
                   <div className="ml-auto">
-                    {selectedRepo.vm?.previewUrl && vmReady && (
+                    {selectedRepo.vm?.previewUrl && (
                       <PublishDialog
                         repo={selectedRepo}
                         onSetProductionDomain={onSetProductionDomain}
@@ -425,17 +384,15 @@ export function RepoWorkspaceShell({
                       : "pointer-events-none opacity-0",
                   )}
                 >
-                  {showWorkspacePanel &&
-                    selectedRepo.vm?.previewUrl &&
-                    vmReady && (
-                      <BrowserControls
-                        previewUrl={selectedRepo.vm.previewUrl}
-                        iframeRef={iframeRef}
-                        repo={selectedRepo}
-                        onSetProductionDomain={onSetProductionDomain}
-                        onPromoteDeployment={onPromoteDeployment}
-                      />
-                    )}
+                  {showWorkspacePanel && selectedRepo.vm?.previewUrl && (
+                    <BrowserControls
+                      previewUrl={selectedRepo.vm.previewUrl}
+                      iframeRef={iframeRef}
+                      repo={selectedRepo}
+                      onSetProductionDomain={onSetProductionDomain}
+                      onPromoteDeployment={onPromoteDeployment}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -469,7 +426,7 @@ export function RepoWorkspaceShell({
               )}
             >
               {showWorkspacePanel &&
-                (selectedRepo?.vm?.previewUrl && vmReady ? (
+                (selectedRepo?.vm?.previewUrl ? (
                   <AppPreview
                     metadata={selectedRepo.vm}
                     iframeRef={iframeRef}
