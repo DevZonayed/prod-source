@@ -5,6 +5,7 @@ import { TEMPLATE_REPO } from "@/lib/vars";
 import { createVmForRepo } from "@/lib/adorable-vm";
 import { getOrCreateIdentitySession } from "@/lib/identity-session";
 import {
+  ADORABLE_WRAPPER_REPO_PREFIX,
   type RepoMetadata,
   type RepoDeploymentSummary,
   createConversationInRepo,
@@ -12,12 +13,10 @@ import {
   writeRepoMetadata,
 } from "@/lib/repo-storage";
 
-const ADORABLE_REPO_PREFIX = "adorable - ";
-
 const toDisplayRepoName = (name?: string | null) => {
   if (!name) return undefined;
-  return name.startsWith(ADORABLE_REPO_PREFIX)
-    ? name.slice(ADORABLE_REPO_PREFIX.length)
+  return name.startsWith(ADORABLE_WRAPPER_REPO_PREFIX)
+    ? name.slice(ADORABLE_WRAPPER_REPO_PREFIX.length)
     : name;
 };
 
@@ -87,6 +86,9 @@ const toRepoResponse = async (
 export async function GET() {
   const { identityId, identity } = await getOrCreateIdentitySession();
   const { repositories } = await identity.permissions.git.list({ limit: 200 });
+  const wrapperRepositories = repositories.filter((repo) =>
+    (repo.name ?? "").startsWith(ADORABLE_WRAPPER_REPO_PREFIX),
+  );
 
   let deploymentEntries: DeploymentEntry[] = [];
   try {
@@ -99,7 +101,7 @@ export async function GET() {
   }
 
   const items = await Promise.all(
-    repositories.map((repo) => toRepoResponse(repo, deploymentEntries)),
+    wrapperRepositories.map((repo) => toRepoResponse(repo, deploymentEntries)),
   );
 
   return NextResponse.json({
@@ -135,46 +137,56 @@ export async function POST(req: Request) {
   }
 
   // Create repo with GitHub Sync or from template
-  let repoId: string;
+  let sourceRepoId: string;
   if (githubRepoName) {
-    // Create repo and enable GitHub Sync
-    const { repo, repoId: createdRepoId } = await freestyle.git.repos.create({
-      ...(requestedName
-        ? { name: `${ADORABLE_REPO_PREFIX}${requestedName}` }
-        : {}),
-    });
-    repoId = createdRepoId;
+    const { repo, repoId: createdRepoId } = await freestyle.git.repos.create(
+      requestedName ? { name: requestedName } : {},
+    );
+    sourceRepoId = createdRepoId;
 
     // Enable GitHub Sync
     await repo.githubSync.enable({ githubRepoName });
   } else {
     // Create from template
     const created = await freestyle.git.repos.create({
-      ...(requestedName
-        ? { name: `${ADORABLE_REPO_PREFIX}${requestedName}` }
-        : {}),
+      ...(requestedName ? { name: requestedName } : {}),
       import: {
         commitMessage: "Initial commit",
         url: TEMPLATE_REPO,
         type: "git",
       },
     });
-    repoId = created.repoId;
+    sourceRepoId = created.repoId;
   }
+
+  const inferredName =
+    requestedName ?? githubRepoName?.split("/").pop()?.trim() ?? "Project";
+  const wrapperRepoName = `${ADORABLE_WRAPPER_REPO_PREFIX}${inferredName}`;
+  const wrapperCreated = await freestyle.git.repos.create({
+    name: wrapperRepoName,
+  });
+  const wrapperRepoId = wrapperCreated.repoId;
 
   await identity.permissions.git.grant({
     permission: "write",
-    repoId,
+    repoId: sourceRepoId,
   });
 
-  const vm = await createVmForRepo(repoId);
+  await identity.permissions.git.grant({
+    permission: "write",
+    repoId: wrapperRepoId,
+  });
+
+  const vm = await createVmForRepo(sourceRepoId);
 
   await identity.permissions.vms.grant({
     vmId: vm.vmId,
   });
 
   const initialMetadata: RepoMetadata = {
-    version: 1,
+    version: 2,
+    sourceRepoId,
+    ...(requestedName ? { name: requestedName } : {}),
     vm,
     conversations: [],
     deployments: [],
@@ -182,18 +194,18 @@ export async function POST(req: Request) {
     productionDeploymentId: null,
   };
 
-  await writeRepoMetadata(repoId, initialMetadata);
+  await writeRepoMetadata(wrapperRepoId, initialMetadata);
 
   const conversationId = randomUUID();
   const metadata = await createConversationInRepo(
-    repoId,
+    wrapperRepoId,
     initialMetadata,
     conversationId,
     requestedConversationTitle,
   );
 
   return NextResponse.json({
-    id: repoId,
+    id: wrapperRepoId,
     metadata,
     conversationId,
   });

@@ -58,7 +58,8 @@ export async function POST(req: Request) {
   });
 
   const tools = createVmTools(vm, {
-    repoId,
+    sourceRepoId: metadata.sourceRepoId,
+    metadataRepoId: repoId,
   });
 
   // Read user-provided API key from cookie (if no global env key)

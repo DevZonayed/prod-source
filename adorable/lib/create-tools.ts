@@ -6,7 +6,8 @@ import { addRepoDeployment, readRepoMetadata } from "./repo-storage";
 import { WORKDIR, VM_PORT } from "./vars";
 
 type CreateToolsOptions = {
-  repoId?: string;
+  sourceRepoId?: string;
+  metadataRepoId?: string;
 };
 
 const normalizeRelativePath = (rawPath: string): string | null => {
@@ -338,16 +339,16 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
       )} push`;
       const commitResult = await runExecCommand(gitCommand);
 
-      if (commitResult.ok && options?.repoId) {
+      if (commitResult.ok && options?.sourceRepoId && options?.metadataRepoId) {
         void (async () => {
           const commitSha = await getHeadCommitSha();
           if (!commitSha) return;
 
           const deploymentDomain = getDomainForCommit(commitSha);
-          const metadata = await readRepoMetadata(options.repoId!);
+          const metadata = await readRepoMetadata(options.metadataRepoId!);
           if (!metadata) return;
 
-          await addRepoDeployment(options.repoId!, metadata, {
+          await addRepoDeployment(options.metadataRepoId!, metadata, {
             commitSha,
             commitMessage: message,
             commitDate: new Date().toISOString(),
@@ -358,7 +359,7 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
           });
 
           const deployment = await freestyle.serverless.deployments.create({
-            repo: options.repoId!,
+            repo: options.sourceRepoId!,
             domains: [deploymentDomain],
             build: true,
           });
@@ -368,10 +369,12 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
               ? String((deployment as Record<string, unknown>).id ?? "") || null
               : null;
 
-          const latestMetadata = await readRepoMetadata(options.repoId!);
+          const latestMetadata = await readRepoMetadata(
+            options.metadataRepoId!,
+          );
           if (!latestMetadata) return;
 
-          await addRepoDeployment(options.repoId!, latestMetadata, {
+          await addRepoDeployment(options.metadataRepoId!, latestMetadata, {
             commitSha,
             commitMessage: message,
             commitDate: new Date().toISOString(),

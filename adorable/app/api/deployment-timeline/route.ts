@@ -1,4 +1,5 @@
 import { getDeploymentTimelineFromCommits } from "@/lib/deployment-status";
+import { resolveSourceRepoId } from "@/lib/repo-storage";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -14,8 +15,9 @@ export async function GET(req: Request) {
   }
 
   try {
+    const sourceRepoId = await resolveSourceRepoId(repoId);
     const timeline = await getDeploymentTimelineFromCommits(
-      repoId,
+      sourceRepoId,
       Number.isFinite(limit) ? Math.min(Math.max(limit, 1), 30) : 12,
     );
     return Response.json({ ok: true, timeline });

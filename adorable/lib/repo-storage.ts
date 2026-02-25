@@ -1,8 +1,9 @@
 import { type UIMessage } from "ai";
 import { freestyle } from "freestyle-sandboxes";
 
-export const ADORABLE_METADATA_PATH = ".adorable/metadata.json";
-export const ADORABLE_CONVERSATIONS_DIR = ".adorable/conversations";
+export const ADORABLE_METADATA_PATH = "metadata.json";
+export const ADORABLE_CONVERSATIONS_DIR = "conversations";
+export const ADORABLE_WRAPPER_REPO_PREFIX = "adorable-meta - ";
 
 export type RepoVmMetadata = {
   vmId: string;
@@ -29,7 +30,19 @@ export type RepoDeploymentSummary = {
 };
 
 export type RepoMetadata = {
-  version: 1;
+  version: 2;
+  sourceRepoId: string;
+  name?: string;
+  vm: RepoVmMetadata;
+  conversations: RepoConversationSummary[];
+  deployments: RepoDeploymentSummary[];
+  productionDomain: string | null;
+  productionDeploymentId: string | null;
+};
+
+type StoredRepoMetadata = {
+  version: 2;
+  sourceRepoId: string;
   name?: string;
   vm: RepoVmMetadata;
   conversations: RepoConversationSummary[];
@@ -110,26 +123,28 @@ const deriveConversationTitle = (
 export const readRepoMetadata = async (
   repoId: string,
 ): Promise<RepoMetadata | null> => {
-  const metadata = await readJsonFile<RepoMetadata>(
+  const metadata = await readJsonFile<StoredRepoMetadata>(
     repoId,
     ADORABLE_METADATA_PATH,
   );
   if (!metadata) return null;
+  if (!metadata.sourceRepoId) return null;
 
   return {
-    ...metadata,
-    deployments: Array.isArray(metadata.deployments)
-      ? metadata.deployments
-      : [],
-    productionDomain:
-      typeof metadata.productionDomain === "string"
-        ? metadata.productionDomain
-        : null,
-    productionDeploymentId:
-      typeof metadata.productionDeploymentId === "string"
-        ? metadata.productionDeploymentId
-        : null,
+    version: metadata.version,
+    sourceRepoId: metadata.sourceRepoId,
+    name: metadata.name,
+    vm: metadata.vm,
+    conversations: metadata.conversations,
+    deployments: metadata.deployments,
+    productionDomain: metadata.productionDomain,
+    productionDeploymentId: metadata.productionDeploymentId,
   };
+};
+
+export const resolveSourceRepoId = async (repoId: string) => {
+  const metadata = await readRepoMetadata(repoId);
+  return metadata?.sourceRepoId ?? repoId;
 };
 
 export const writeRepoMetadata = async (
@@ -156,7 +171,9 @@ export const createConversationInRepo = async (
       : `Conversation ${latestMetadata.conversations.length + 1}`;
 
   const nextMetadata: RepoMetadata = {
+    ...metadata,
     ...latestMetadata,
+    sourceRepoId: latestMetadata.sourceRepoId,
     conversations: [
       {
         id: conversationId,

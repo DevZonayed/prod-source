@@ -1,4 +1,5 @@
 import { getDeploymentStatusForLatestCommit } from "@/lib/deployment-status";
+import { resolveSourceRepoId } from "@/lib/repo-storage";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -14,8 +15,9 @@ export async function GET(req: Request) {
   }
 
   try {
+    const sourceRepoId = await resolveSourceRepoId(repoId);
     const status = await getDeploymentStatusForLatestCommit(
-      repoId,
+      sourceRepoId,
       isAgentRunning,
     );
     return Response.json({ ok: true, ...status });
