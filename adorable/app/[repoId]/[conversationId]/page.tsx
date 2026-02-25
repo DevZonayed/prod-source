@@ -1,4 +1,5 @@
 import { Assistant } from "../../assistant";
+import { RepoWelcome } from "@/components/assistant-ui/repo-welcome";
 import { getOrCreateIdentitySession } from "@/lib/identity-session";
 import { readConversationMessages } from "@/lib/repo-storage";
 
@@ -21,6 +22,7 @@ export default async function ConversationPage({
         initialMessages={[]}
         selectedRepoId={repoId}
         selectedConversationId={conversationId}
+        welcome={<RepoWelcome />}
       />
     );
   }
@@ -34,6 +36,7 @@ export default async function ConversationPage({
       initialMessages={initialMessages}
       selectedRepoId={repoId}
       selectedConversationId={conversationId}
+      welcome={<RepoWelcome />}
     />
   );
 }

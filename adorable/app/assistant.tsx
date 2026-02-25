@@ -9,6 +9,7 @@ import { useChat } from "@ai-sdk/react";
 import { type UIMessage } from "ai";
 import { Thread } from "@/components/assistant-ui/thread";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 
 type ThreadState = {
   isEmpty: boolean;
@@ -38,12 +39,14 @@ export const Assistant = ({
   selectedConversationId = null,
   onThreadStateChange,
   onActiveConversationChange,
+  welcome,
 }: {
   initialMessages?: UIMessage[];
   selectedRepoId?: string | null;
   selectedConversationId?: string | null;
   onThreadStateChange?: (next: ThreadState) => void;
   onActiveConversationChange?: (repoId: string, conversationId: string) => void;
+  welcome?: ReactNode;
 }) => {
   const resolvedInitialMessages = initialMessages ?? EMPTY_MESSAGES;
 
@@ -376,7 +379,7 @@ export const Assistant = ({
   return (
     <AssistantRuntimeProvider key={runtimeKey} runtime={runtime}>
       <ThreadStateBridge onThreadStateChange={handleThreadStateChange} />
-      <Thread />
+      <Thread welcome={welcome} />
     </AssistantRuntimeProvider>
   );
 };

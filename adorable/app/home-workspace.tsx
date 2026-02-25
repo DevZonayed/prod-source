@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { Assistant } from "./assistant";
 import { RepoWorkspaceShell } from "./[repoId]/repo-workspace-shell";
+import { HomeWelcome } from "@/components/assistant-ui/home-welcome";
 
 export function HomeWorkspace() {
   const [activeRepoId, setActiveRepoId] = useState<string | null>(null);
@@ -27,6 +28,7 @@ export function HomeWorkspace() {
         selectedRepoId={activeRepoId}
         selectedConversationId={activeConversationId}
         onActiveConversationChange={handleActiveConversationChange}
+        welcome={<HomeWelcome />}
       />
     </RepoWorkspaceShell>
   );
