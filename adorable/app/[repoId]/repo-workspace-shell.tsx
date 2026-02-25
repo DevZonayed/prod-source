@@ -56,6 +56,7 @@ export function RepoWorkspaceShell({
     null;
 
   const [repos, setRepos] = useState<RepoItem[]>([]);
+  const [reposLoading, setReposLoading] = useState(true);
   const [threadIsRunning, setThreadIsRunning] = useState(false);
   const hasDeployingRepo = repos.some((repo) =>
     repo.deployments.some((deployment) => deployment.state === "deploying"),
@@ -63,7 +64,10 @@ export function RepoWorkspaceShell({
 
   const loadRepos = useCallback(async () => {
     const response = await fetch("/api/repos", { cache: "no-store" });
-    if (!response.ok) return;
+    if (!response.ok) {
+      setReposLoading(false);
+      return;
+    }
 
     const data = await response.json();
     const nextRepos: RepoItem[] = Array.isArray(data.repositories)
@@ -101,6 +105,7 @@ export function RepoWorkspaceShell({
       : [];
 
     setRepos(nextRepos);
+    setReposLoading(false);
   }, []);
 
   useEffect(() => {
@@ -296,9 +301,10 @@ export function RepoWorkspaceShell({
   const reposContextValue = useMemo(
     () => ({
       repos,
+      isLoading: reposLoading,
       onSelectProject: handleSelectProject,
     }),
-    [repos, handleSelectProject],
+    [repos, reposLoading, handleSelectProject],
   );
 
   const iframeRef = useRef<HTMLIFrameElement>(null);

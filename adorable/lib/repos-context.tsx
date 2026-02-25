@@ -5,11 +5,13 @@ import type { RepoItem } from "@/lib/repo-types";
 
 type ReposContextValue = {
   repos: RepoItem[];
+  isLoading: boolean;
   onSelectProject: (repoId: string) => void;
 };
 
 const ReposContext = createContext<ReposContextValue>({
   repos: [],
+  isLoading: true,
   onSelectProject: () => {},
 });
 
