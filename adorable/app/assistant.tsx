@@ -15,6 +15,10 @@ type ThreadState = {
   isRunning: boolean;
 };
 
+type CreateFromGithubDetail = {
+  githubRepoName: string;
+};
+
 const EMPTY_MESSAGES: UIMessage[] = [];
 
 const extractUserPrompt = (messages: UIMessage[]): string | null => {
@@ -124,6 +128,62 @@ export const Assistant = ({
       window.removeEventListener(
         "adorable:go-to-repo",
         handleGoToRepo as EventListener,
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleCreateFromGithub = async (event: Event) => {
+      const customEvent = event as CustomEvent<CreateFromGithubDetail>;
+      const githubRepoName = customEvent.detail?.githubRepoName?.trim();
+      if (!githubRepoName) return;
+
+      const response = await fetch("/api/repos", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ githubRepoName }),
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const data = await response.json();
+      const repoId = data.id as string | undefined;
+      const conversationId = data.conversationId as string | undefined;
+
+      if (!repoId || !conversationId) {
+        return;
+      }
+
+      const nextPath = `/${repoId}/${conversationId}`;
+      window.history.replaceState(window.history.state, "", nextPath);
+      setSeedMessages(EMPTY_MESSAGES);
+      setLocalRepoId(repoId);
+      setLocalConversationId(conversationId);
+      activeRepoIdRef.current = repoId;
+      activeConversationIdRef.current = conversationId;
+      chatSessionIdRef.current = `conversation:${conversationId}`;
+      setRuntimeVersion((version) => version + 1);
+      onActiveConversationChangeRef.current?.(repoId, conversationId);
+      window.dispatchEvent(
+        new CustomEvent("adorable:active-conversation", {
+          detail: { repoId, conversationId },
+        }),
+      );
+      window.dispatchEvent(new Event("adorable:repos-updated"));
+    };
+
+    window.addEventListener(
+      "adorable:create-from-github",
+      handleCreateFromGithub as EventListener,
+    );
+    return () => {
+      window.removeEventListener(
+        "adorable:create-from-github",
+        handleCreateFromGithub as EventListener,
       );
     };
   }, []);

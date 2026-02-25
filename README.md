@@ -10,6 +10,7 @@ An open-source AI app builder. Describe what you want, and Adorable builds it fo
 - **Live preview & terminal** — See your app update in real time with an embedded browser and terminal
 - **One-click publish** — Deploy to a production domain with a single click
 - **Persistent projects** — Every project is backed by a git repo; conversations and history are preserved across sessions
+- **GitHub Sync** — Create projects from existing GitHub repositories with bidirectional sync (see https://docs.freestyle.sh/v2/git/github-sync for setup)
 
 ## Tech Stack
 

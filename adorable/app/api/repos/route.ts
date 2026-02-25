@@ -113,32 +113,54 @@ export async function POST(req: Request) {
 
   let requestedName: string | undefined;
   let requestedConversationTitle: string | undefined;
+  let githubRepoName: string | undefined;
   try {
     const payload = (await req.json()) as {
       name?: string;
       conversationTitle?: string;
+      githubRepoName?: string;
     };
     const nextName = payload?.name?.trim();
     const nextConversationTitle = payload?.conversationTitle?.trim();
+    const nextGithubRepoName = payload?.githubRepoName?.trim();
     requestedName = nextName ? nextName : undefined;
     requestedConversationTitle = nextConversationTitle
       ? nextConversationTitle
       : undefined;
+    githubRepoName = nextGithubRepoName ? nextGithubRepoName : undefined;
   } catch {
     requestedName = undefined;
     requestedConversationTitle = undefined;
+    githubRepoName = undefined;
   }
 
-  const { repoId } = await freestyle.git.repos.create({
-    ...(requestedName
-      ? { name: `${ADORABLE_REPO_PREFIX}${requestedName}` }
-      : {}),
-    import: {
-      commitMessage: "Initial commit",
-      url: TEMPLATE_REPO,
-      type: "git",
-    },
-  });
+  // Create repo with GitHub Sync or from template
+  let repoId: string;
+  if (githubRepoName) {
+    // Create repo and enable GitHub Sync
+    const { repo, repoId: createdRepoId } = await freestyle.git.repos.create({
+      ...(requestedName
+        ? { name: `${ADORABLE_REPO_PREFIX}${requestedName}` }
+        : {}),
+    });
+    repoId = createdRepoId;
+
+    // Enable GitHub Sync
+    await repo.githubSync.enable({ githubRepoName });
+  } else {
+    // Create from template
+    const created = await freestyle.git.repos.create({
+      ...(requestedName
+        ? { name: `${ADORABLE_REPO_PREFIX}${requestedName}` }
+        : {}),
+      import: {
+        commitMessage: "Initial commit",
+        url: TEMPLATE_REPO,
+        type: "git",
+      },
+    });
+    repoId = created.repoId;
+  }
 
   await identity.permissions.git.grant({
     permission: "write",

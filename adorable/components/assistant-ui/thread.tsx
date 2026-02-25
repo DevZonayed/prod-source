@@ -27,6 +27,16 @@ import {
 } from "@/components/assistant-ui/tool-group";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
   ActionBarMorePrimitive,
@@ -51,7 +61,7 @@ import {
   RefreshCwIcon,
   SquareIcon,
 } from "lucide-react";
-import { type FC } from "react";
+import { type FC, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useProjectConversations } from "@/lib/project-conversations-context";
 import { useRepos } from "@/lib/repos-context";
@@ -106,6 +116,26 @@ const ThreadWelcome: FC = () => {
   const { conversations, onSelectConversation, repoId } =
     useProjectConversations();
   const { repos, onSelectProject } = useRepos();
+  const [githubDialogOpen, setGithubDialogOpen] = useState(false);
+  const [githubRepoInput, setGithubRepoInput] = useState("");
+  const [githubRepoError, setGithubRepoError] = useState<string | null>(null);
+
+  const handleUseGithubRepo = () => {
+    const githubRepoName = githubRepoInput.trim();
+    if (!githubRepoName.includes("/")) {
+      setGithubRepoError("Repository must be in owner/repo format");
+      return;
+    }
+
+    setGithubRepoError(null);
+    window.dispatchEvent(
+      new CustomEvent("adorable:create-from-github", {
+        detail: { githubRepoName },
+      }),
+    );
+    setGithubDialogOpen(false);
+    setGithubRepoInput("");
+  };
 
   const hasConversations = repoId && conversations.length > 0;
   const hasProjects = isHome && repos.length > 0;
@@ -144,6 +174,65 @@ const ThreadWelcome: FC = () => {
           <h1 className="aui-thread-welcome-message-inner animate-in text-2xl font-semibold tracking-tight duration-300 fade-in slide-in-from-bottom-2 md:text-3xl">
             {isHome ? "What do you want to build?" : ""}
           </h1>
+          {isHome && (
+            <Dialog open={githubDialogOpen} onOpenChange={setGithubDialogOpen}>
+              <DialogTrigger asChild>
+                <Button type="button" variant="outline" className="mt-4">
+                  Use GitHub Repo
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Use GitHub Repo</DialogTitle>
+                  <DialogDescription>
+                    Enter a repository in owner/repo format. If you haven’t
+                    installed the GitHub App yet, install it first.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <Input
+                    value={githubRepoInput}
+                    onChange={(event) => {
+                      setGithubRepoInput(event.target.value);
+                      setGithubRepoError(null);
+                    }}
+                    placeholder="owner/repository"
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handleUseGithubRepo();
+                      }
+                    }}
+                  />
+                  {githubRepoError && (
+                    <p className="text-[13px] text-destructive">
+                      {githubRepoError}
+                    </p>
+                  )}
+                  <a
+                    href="https://dash.freestyle.sh/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-block text-xs text-muted-foreground underline-offset-2 hover:underline"
+                  >
+                    Install GitHub App (Dashboard → Git → Sync)
+                  </a>
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setGithubDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="button" onClick={handleUseGithubRepo}>
+                    Create Project
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
 
         {/* Projects on home screen */}
