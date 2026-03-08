@@ -10,12 +10,16 @@ import { PublishDialog } from "@/components/assistant-ui/publish-dialog";
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
+  ChevronDownIcon,
   ChevronLeftIcon,
+  ChevronUpIcon,
   CodeIcon,
+  FileTextIcon,
   Loader2Icon,
   MonitorIcon,
   PlusIcon,
   RotateCwIcon,
+  TerminalIcon,
   XIcon,
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -37,6 +41,11 @@ type OptimisticMetadataDetail = {
 type ThreadStateDetail = {
   repoId: string | null;
   isRunning: boolean;
+};
+
+type RouteEntry = {
+  path: string;
+  type: "page" | "api";
 };
 
 export function RepoWorkspaceShell({
@@ -317,7 +326,7 @@ export function RepoWorkspaceShell({
           {repoId && selectedRepo && (
             <div
               className={cn(
-                "shrink-0 border-b bg-background transition-[grid-template-columns] duration-500 ease-in-out",
+                "shrink-0 border-b border-border/50 bg-background/80 backdrop-blur-sm transition-[grid-template-columns] duration-500 ease-in-out",
                 isMobile ? "flex h-11 items-center" : "grid h-11",
               )}
               style={
@@ -342,7 +351,7 @@ export function RepoWorkspaceShell({
                         router.push("/");
                       }
                     }}
-                    className="flex items-center gap-1 rounded-md px-1.5 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-muted-foreground transition-all hover:bg-accent hover:text-accent-foreground"
                     title={
                       selectedConversationId ? "All conversations" : "All apps"
                     }
@@ -363,7 +372,7 @@ export function RepoWorkspaceShell({
                   <button
                     type="button"
                     onClick={() => setMobileView("chat")}
-                    className="flex items-center gap-1 rounded-md px-1.5 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-muted-foreground transition-all hover:bg-accent hover:text-accent-foreground"
                   >
                     <ChevronLeftIcon className="size-3.5" />
                     <span className="text-sm font-medium">Chat</span>
@@ -407,7 +416,7 @@ export function RepoWorkspaceShell({
           {/* Main content grid */}
           <div
             className={cn(
-              "grid min-h-0 flex-1 pb-2",
+              "grid min-h-0 flex-1",
               !isMobile &&
                 "transition-[grid-template-columns] duration-500 ease-in-out",
             )}
@@ -436,6 +445,7 @@ export function RepoWorkspaceShell({
                   <AppPreview
                     metadata={selectedRepo.vm}
                     iframeRef={iframeRef}
+                    repoId={repoId!}
                   />
                 ) : (
                   <PreviewPlaceholder />
@@ -450,7 +460,7 @@ export function RepoWorkspaceShell({
               onClick={() =>
                 setMobileView((v) => (v === "chat" ? "preview" : "chat"))
               }
-              className="fixed right-4 bottom-20 z-50 flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95"
+              className="fixed right-4 bottom-20 z-50 flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-xl shadow-primary/20 transition-all active:scale-90"
               title={mobileView === "chat" ? "Show preview" : "Show chat"}
             >
               {mobileView === "chat" ? (
@@ -468,54 +478,46 @@ export function RepoWorkspaceShell({
 
 function PreviewPlaceholder() {
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex h-10 shrink-0 items-center gap-1.5 border-b bg-muted/20 px-2">
-        <div className="size-6 rounded bg-muted-foreground/8" />
-        <div className="size-6 rounded bg-muted-foreground/8" />
-        <div className="size-6 rounded bg-muted-foreground/8" />
-        <div className="ml-1 h-7 flex-1 rounded-md bg-muted/50" />
-      </div>
-
-      <div className="h-[70%] overflow-hidden p-8">
-        <div className="mx-auto max-w-md space-y-8">
-          <div className="flex items-center justify-between">
-            <div className="h-4 w-20 animate-pulse rounded bg-muted/60" />
-            <div className="flex gap-4">
-              <div className="h-3 w-12 animate-pulse rounded bg-muted/40" />
-              <div className="h-3 w-12 animate-pulse rounded bg-muted/40" />
-              <div className="h-3 w-12 animate-pulse rounded bg-muted/40" />
-            </div>
+    <div className="flex h-full flex-col p-2">
+      <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border/50 bg-background">
+        <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-border/30 bg-muted/10 px-3">
+          <div className="flex gap-1.5">
+            <div className="size-2.5 rounded-full bg-muted-foreground/15" />
+            <div className="size-2.5 rounded-full bg-muted-foreground/15" />
+            <div className="size-2.5 rounded-full bg-muted-foreground/15" />
           </div>
+          <div className="ml-3 h-6 flex-1 rounded-lg bg-muted/30" />
+        </div>
 
-          <div className="flex flex-col items-center gap-4 py-6">
-            <div className="h-6 w-56 animate-pulse rounded bg-muted/50" />
-            <div className="h-4 w-40 animate-pulse rounded bg-muted/30" />
-            <div className="mt-2 h-9 w-28 animate-pulse rounded-lg bg-muted/40" />
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="space-y-2 rounded-lg border border-muted/30 p-3"
-              >
-                <div className="h-3 w-full animate-pulse rounded bg-muted/40" />
-                <div className="h-2 w-3/4 animate-pulse rounded bg-muted/25" />
-                <div className="h-2 w-1/2 animate-pulse rounded bg-muted/20" />
+        <div className="flex-1 overflow-hidden p-8">
+          <div className="mx-auto max-w-md space-y-8">
+            <div className="flex items-center justify-between">
+              <div className="h-4 w-20 animate-pulse rounded bg-muted/60" />
+              <div className="flex gap-4">
+                <div className="h-3 w-12 animate-pulse rounded bg-muted/40" />
+                <div className="h-3 w-12 animate-pulse rounded bg-muted/40" />
+                <div className="h-3 w-12 animate-pulse rounded bg-muted/40" />
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
+            </div>
 
-      <div className="flex h-[30%] min-h-0 flex-col border-t">
-        <div className="flex h-8 shrink-0 items-center bg-muted/20 px-3">
-          <div className="h-3.5 w-20 animate-pulse rounded bg-muted-foreground/10" />
-        </div>
-        <div className="flex-1 p-3">
-          <div className="space-y-2">
-            <div className="h-2.5 w-48 animate-pulse rounded bg-muted-foreground/8" />
-            <div className="h-2.5 w-32 animate-pulse rounded bg-muted-foreground/6" />
+            <div className="flex flex-col items-center gap-4 py-6">
+              <div className="h-6 w-56 animate-pulse rounded bg-muted/50" />
+              <div className="h-4 w-40 animate-pulse rounded bg-muted/30" />
+              <div className="mt-2 h-9 w-28 animate-pulse rounded-lg bg-muted/40" />
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="space-y-2 rounded-lg border border-muted/20 p-3"
+                >
+                  <div className="h-3 w-full animate-pulse rounded bg-muted/40" />
+                  <div className="h-2 w-3/4 animate-pulse rounded bg-muted/25" />
+                  <div className="h-2 w-1/2 animate-pulse rounded bg-muted/20" />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -526,9 +528,11 @@ function PreviewPlaceholder() {
 function AppPreview({
   metadata,
   iframeRef,
+  repoId,
 }: {
   metadata: RepoVmInfo;
   iframeRef: React.RefObject<HTMLIFrameElement | null>;
+  repoId: string;
 }) {
   const [extraTerminals, setExtraTerminals] = useState<TerminalTab[]>([]);
   const [activeTab, setActiveTab] = useState("dev-server");
@@ -537,6 +541,7 @@ function AppPreview({
   const [loadedTerminals, setLoadedTerminals] = useState<Set<string>>(
     new Set(),
   );
+  const [terminalOpen, setTerminalOpen] = useState(false);
 
   const markTerminalLoaded = useCallback((id: string) => {
     setLoadedTerminals((prev) => new Set(prev).add(id));
@@ -560,6 +565,7 @@ function AppPreview({
     ]);
     setActiveTab(id);
     setCounter((c) => c + 1);
+    setTerminalOpen(true);
   }, [counter, metadata.additionalTerminalsUrl]);
 
   const closeTerminal = useCallback(
@@ -585,98 +591,137 @@ function AppPreview({
   ];
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <div className="relative flex h-[70%] min-h-0 flex-col">
-        <div className="relative min-h-0 flex-1 bg-muted/30">
-          {!iframeLoaded && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
-              <div className="flex flex-col items-center gap-3">
-                <Loader2Icon className="size-6 animate-spin text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground/40">
-                  Loading preview…
-                </p>
+    <div className="flex h-full flex-col overflow-hidden p-2 pl-0">
+      {/* Preview pane */}
+      <div
+        className="relative flex min-h-0 flex-col overflow-hidden rounded-xl border border-border/50 bg-background transition-all duration-300"
+        style={{ flex: terminalOpen ? "1 1 65%" : "1 1 100%" }}
+      >
+        {/* Loading state */}
+        {!iframeLoaded && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
+            <div className="flex flex-col items-center gap-3">
+              <div className="relative">
+                <div className="absolute inset-0 animate-ping rounded-full bg-primary/20" />
+                <Loader2Icon className="relative size-6 animate-spin text-muted-foreground/60" />
               </div>
+              <p className="text-sm text-muted-foreground/50">
+                Loading preview...
+              </p>
             </div>
+          </div>
+        )}
+        <iframe
+          ref={iframeRef}
+          src={metadata.previewUrl}
+          className={cn(
+            "h-full w-full rounded-xl transition-opacity duration-500",
+            iframeLoaded ? "opacity-100" : "opacity-0",
           )}
-          <iframe
-            ref={iframeRef}
-            src={metadata.previewUrl}
-            className={cn(
-              "h-full w-full transition-opacity duration-300",
-              iframeLoaded ? "opacity-100" : "opacity-0",
-            )}
-            onLoad={() => setIframeLoaded(true)}
-          />
-        </div>
+          onLoad={() => setIframeLoaded(true)}
+        />
       </div>
 
-      <div className="flex h-[30%] min-h-0 flex-col">
-        <div className="flex shrink-0 items-center gap-0 border-y bg-[rgb(43,43,43)] px-1">
-          {allTabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`group flex items-center gap-1 px-2 py-1.5 text-xs transition-colors ${
-                activeTab === tab.id
-                  ? "border-b-2 border-foreground bg-[rgb(43,43,43)] text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <span>{tab.label}</span>
-              {tab.closable && (
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeTerminal(tab.id);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.stopPropagation();
-                      closeTerminal(tab.id);
-                    }
-                  }}
-                  className="ml-0.5 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted"
+      {/* Terminal panel */}
+      <div
+        className={cn(
+          "flex flex-col overflow-hidden rounded-xl border border-border/50 transition-all duration-300 ease-in-out",
+          terminalOpen ? "mt-2 min-h-0 flex-[0_0_35%]" : "mt-2 h-9 flex-none",
+        )}
+      >
+        {/* Terminal header / tab bar */}
+        <div className="flex shrink-0 items-center gap-0 bg-[rgb(35,35,35)] px-1">
+          {/* Toggle button */}
+          <button
+            type="button"
+            onClick={() => setTerminalOpen((v) => !v)}
+            className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-all hover:bg-white/5 hover:text-foreground"
+          >
+            <TerminalIcon className="size-3.5" />
+            <span>Terminal</span>
+            {terminalOpen ? (
+              <ChevronDownIcon className="size-3" />
+            ) : (
+              <ChevronUpIcon className="size-3" />
+            )}
+          </button>
+
+          {terminalOpen && (
+            <>
+              <div className="mx-1 h-4 w-px bg-white/10" />
+              {allTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    "group flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs transition-all",
+                    activeTab === tab.id
+                      ? "bg-white/10 text-foreground"
+                      : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                  )}
                 >
-                  <XIcon className="size-3" />
-                </span>
-              )}
-            </button>
-          ))}
+                  <span>{tab.label}</span>
+                  {tab.closable && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        closeTerminal(tab.id);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.stopPropagation();
+                          closeTerminal(tab.id);
+                        }
+                      }}
+                      className="ml-0.5 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-white/10"
+                    >
+                      <XIcon className="size-3" />
+                    </span>
+                  )}
+                </button>
+              ))}
 
-          {metadata.additionalTerminalsUrl && (
-            <button
-              type="button"
-              onClick={addTerminal}
-              className="ml-1 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              title="New terminal"
-            >
-              <PlusIcon className="size-3.5" />
-            </button>
+              {metadata.additionalTerminalsUrl && (
+                <button
+                  type="button"
+                  onClick={addTerminal}
+                  className="ml-1 rounded-lg p-1.5 text-muted-foreground transition-all hover:bg-white/5 hover:text-foreground"
+                  title="New terminal"
+                >
+                  <PlusIcon className="size-3.5" />
+                </button>
+              )}
+            </>
           )}
         </div>
 
-        <div className="relative min-h-0 flex-1 bg-[rgb(30,30,30)]">
-          {allTabs.map((tab) => (
-            <iframe
-              key={tab.id}
-              src={tab.url}
-              className={cn(
-                "absolute inset-0 h-full w-full transition-opacity duration-500",
-                loadedTerminals.has(tab.id) ? "opacity-100" : "opacity-0",
-              )}
-              style={{ display: activeTab === tab.id ? "block" : "none" }}
-              onLoad={() => markTerminalLoaded(tab.id)}
-            />
-          ))}
-          {allTabs.length === 0 && (
-            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-              No terminal selected
-            </div>
-          )}
-        </div>
+        {/* Terminal content */}
+        {terminalOpen && (
+          <div className="relative min-h-0 flex-1 bg-[rgb(24,24,24)]">
+            {allTabs.map((tab) => (
+              <iframe
+                key={tab.id}
+                src={tab.url}
+                className={cn(
+                  "absolute inset-0 h-full w-full transition-opacity duration-300",
+                  loadedTerminals.has(tab.id) ? "opacity-100" : "opacity-0",
+                )}
+                style={{
+                  display: activeTab === tab.id ? "block" : "none",
+                }}
+                onLoad={() => markTerminalLoaded(tab.id)}
+              />
+            ))}
+            {allTabs.length === 0 && (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                No terminal selected
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -702,6 +747,11 @@ function BrowserControls({
       return "/";
     }
   });
+  const [showRoutes, setShowRoutes] = useState(false);
+  const [routes, setRoutes] = useState<RouteEntry[]>([]);
+  const [routesLoaded, setRoutesLoaded] = useState(false);
+  const urlInputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
@@ -710,6 +760,52 @@ function BrowserControls({
       setUrlValue("/");
     }
   }, [previewUrl]);
+
+  // Fetch routes when dropdown opens
+  useEffect(() => {
+    if (!showRoutes || routesLoaded) return;
+
+    const fetchRoutes = async () => {
+      try {
+        const response = await fetch(`/api/repos/${repo.id}/routes`);
+        if (response.ok) {
+          const data = (await response.json()) as { routes?: RouteEntry[] };
+          if (Array.isArray(data.routes)) {
+            setRoutes(data.routes);
+          }
+        }
+      } catch {
+        // silently fail
+      }
+      setRoutesLoaded(true);
+    };
+
+    void fetchRoutes();
+  }, [showRoutes, routesLoaded, repo.id]);
+
+  // Refetch routes when routes panel is opened again
+  useEffect(() => {
+    if (showRoutes) {
+      setRoutesLoaded(false);
+    }
+  }, [showRoutes]);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    if (!showRoutes) return;
+    const handleClick = (e: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node) &&
+        urlInputRef.current &&
+        !urlInputRef.current.contains(e.target as Node)
+      ) {
+        setShowRoutes(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showRoutes]);
 
   const baseUrl = (() => {
     try {
@@ -726,6 +822,7 @@ function BrowserControls({
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
     setUrlValue(normalizedPath);
     iframe.src = `${baseUrl}${normalizedPath}`;
+    setShowRoutes(false);
   };
 
   const handleReload = () => {
@@ -746,12 +843,16 @@ function BrowserControls({
     } catch {}
   };
 
+  const filteredRoutes = routes.filter((r) =>
+    r.path.toLowerCase().includes(urlValue.toLowerCase()),
+  );
+
   return (
     <>
       <button
         type="button"
         onClick={handleBack}
-        className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
         title="Back"
       >
         <ArrowLeftIcon className="size-3.5" />
@@ -759,7 +860,7 @@ function BrowserControls({
       <button
         type="button"
         onClick={handleForward}
-        className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
         title="Forward"
       >
         <ArrowRightIcon className="size-3.5" />
@@ -767,26 +868,61 @@ function BrowserControls({
       <button
         type="button"
         onClick={handleReload}
-        className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
         title="Reload"
       >
         <RotateCwIcon className="size-3.5" />
       </button>
-      <form
-        className="ml-1 flex-1"
-        onSubmit={(e) => {
-          e.preventDefault();
-          navigate(urlValue);
-        }}
-      >
-        <input
-          type="text"
-          value={urlValue}
-          onChange={(e) => setUrlValue(e.target.value)}
-          className="h-7 w-full rounded-md bg-muted/50 px-2.5 text-xs text-foreground transition-colors outline-none focus:bg-muted focus:ring-1 focus:ring-ring"
-          aria-label="URL path"
-        />
-      </form>
+      <div className="relative ml-1 flex-1">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            navigate(urlValue);
+          }}
+        >
+          <input
+            ref={urlInputRef}
+            type="text"
+            value={urlValue}
+            onChange={(e) => setUrlValue(e.target.value)}
+            onFocus={() => setShowRoutes(true)}
+            className="h-7 w-full rounded-lg bg-muted/40 px-2.5 text-xs text-foreground transition-all outline-none focus:bg-muted/60 focus:ring-1 focus:ring-ring/30"
+            aria-label="URL path"
+          />
+        </form>
+
+        {/* Route suggestions dropdown */}
+        {showRoutes && filteredRoutes.length > 0 && (
+          <div
+            ref={dropdownRef}
+            className="absolute top-full left-0 z-50 mt-1 w-full overflow-hidden rounded-xl border border-border/50 bg-popover shadow-xl shadow-black/20 animate-in fade-in slide-in-from-top-1 duration-150"
+          >
+            <div className="px-2 py-1.5">
+              <p className="px-1 text-[10px] font-medium tracking-wider text-muted-foreground/60 uppercase">
+                Routes
+              </p>
+            </div>
+            <div className="max-h-48 overflow-y-auto px-1 pb-1">
+              {filteredRoutes.map((route) => (
+                <button
+                  key={route.path}
+                  type="button"
+                  onClick={() => navigate(route.path)}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-all hover:bg-accent",
+                    urlValue === route.path
+                      ? "bg-accent/50 text-foreground"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  <FileTextIcon className="size-3 shrink-0 opacity-50" />
+                  <span className="truncate font-mono">{route.path}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
       <div className="ml-1.5">
         <PublishDialog
           repo={repo}
