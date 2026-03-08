@@ -61,7 +61,7 @@ export const Thread: FC<{ welcome?: ReactNode }> = ({ welcome }) => {
         ["--thread-max-width" as string]: "44rem",
       }}
     >
-      <ThreadPrimitive.Viewport className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-hidden overflow-y-scroll px-4 pt-4">
+      <ThreadPrimitive.Viewport className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-hidden overflow-y-scroll scroll-smooth px-4 pt-4 md:px-6">
         {welcome && (
           <AssistantIf condition={({ thread }) => thread.isEmpty}>
             {welcome}
@@ -76,7 +76,7 @@ export const Thread: FC<{ welcome?: ReactNode }> = ({ welcome }) => {
           }}
         />
 
-        <ThreadPrimitive.ViewportFooter className="aui-thread-viewport-footer sticky bottom-0 mx-auto mt-auto flex w-full max-w-(--thread-max-width) flex-col gap-4 overflow-visible rounded-t-3xl bg-background pb-4 md:pb-6">
+        <ThreadPrimitive.ViewportFooter className="aui-thread-viewport-footer sticky bottom-0 mx-auto mt-auto flex w-full max-w-(--thread-max-width) flex-col gap-4 overflow-visible bg-gradient-to-t from-background via-background to-background/0 pt-6 pb-4 md:pb-6">
           <ThreadScrollToBottom />
           <Composer />
         </ThreadPrimitive.ViewportFooter>
@@ -91,7 +91,7 @@ const ThreadScrollToBottom: FC = () => {
       <TooltipIconButton
         tooltip="Scroll to bottom"
         variant="outline"
-        className="aui-thread-scroll-to-bottom absolute -top-12 z-10 self-center rounded-full p-4 disabled:invisible dark:bg-background dark:hover:bg-accent"
+        className="aui-thread-scroll-to-bottom absolute -top-12 z-10 self-center rounded-full border-border/50 p-4 shadow-lg shadow-black/10 backdrop-blur-sm transition-all disabled:invisible dark:bg-background/80 dark:hover:bg-accent"
       >
         <ArrowDownIcon />
       </TooltipIconButton>
@@ -101,11 +101,11 @@ const ThreadScrollToBottom: FC = () => {
 const Composer: FC = () => {
   return (
     <ComposerPrimitive.Root className="aui-composer-root relative flex w-full flex-col">
-      <ComposerPrimitive.AttachmentDropzone className="aui-composer-attachment-dropzone flex w-full flex-col rounded-2xl border border-input bg-background px-1 pt-2 transition-shadow outline-none has-[textarea:focus-visible]:border-ring has-[textarea:focus-visible]:ring-2 has-[textarea:focus-visible]:ring-ring/20 data-[dragging=true]:border-dashed data-[dragging=true]:border-ring data-[dragging=true]:bg-accent/50">
+      <ComposerPrimitive.AttachmentDropzone className="aui-composer-attachment-dropzone flex w-full flex-col rounded-2xl border border-border/60 bg-background shadow-sm shadow-black/5 transition-all outline-none has-[textarea:focus-visible]:border-ring/40 has-[textarea:focus-visible]:shadow-md has-[textarea:focus-visible]:shadow-ring/5 has-[textarea:focus-visible]:ring-1 has-[textarea:focus-visible]:ring-ring/20 data-[dragging=true]:border-dashed data-[dragging=true]:border-ring data-[dragging=true]:bg-accent/50">
         <ComposerAttachments />
         <ComposerPrimitive.Input
           placeholder="Send a message..."
-          className="aui-composer-input mb-1 max-h-32 min-h-14 w-full resize-none bg-transparent px-4 pt-2 pb-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-0"
+          className="aui-composer-input mb-1 max-h-40 min-h-14 w-full resize-none bg-transparent px-4 pt-3 pb-3 text-sm leading-relaxed outline-none placeholder:text-muted-foreground/50 focus-visible:ring-0"
           rows={1}
           aria-label="Message input"
         />
@@ -166,7 +166,7 @@ const MessageError: FC = () => {
 const AssistantMessage: FC = () => {
   return (
     <MessagePrimitive.Root
-      className="aui-assistant-message-root relative mx-auto w-full max-w-(--thread-max-width) animate-in py-3 duration-150 fade-in slide-in-from-bottom-1"
+      className="aui-assistant-message-root relative mx-auto w-full max-w-(--thread-max-width) animate-in py-4 duration-300 fade-in slide-in-from-bottom-2"
       data-role="assistant"
     >
       <div className="aui-assistant-message-content px-2 leading-relaxed wrap-break-word text-foreground">
@@ -259,13 +259,13 @@ const AssistantActionBar: FC = () => {
 const UserMessage: FC = () => {
   return (
     <MessagePrimitive.Root
-      className="aui-user-message-root mx-auto grid w-full max-w-(--thread-max-width) animate-in auto-rows-auto grid-cols-[minmax(72px,1fr)_auto] content-start gap-y-2 px-2 py-3 duration-150 fade-in slide-in-from-bottom-1 [&:where(>*)]:col-start-2"
+      className="aui-user-message-root mx-auto grid w-full max-w-(--thread-max-width) animate-in auto-rows-auto grid-cols-[minmax(72px,1fr)_auto] content-start gap-y-2 px-2 py-4 duration-300 fade-in slide-in-from-bottom-2 [&:where(>*)]:col-start-2"
       data-role="user"
     >
       <UserMessageAttachments />
 
       <div className="aui-user-message-content-wrapper relative col-start-2 min-w-0">
-        <div className="aui-user-message-content rounded-2xl bg-muted px-4 py-2.5 wrap-break-word text-foreground">
+        <div className="aui-user-message-content rounded-2xl bg-muted/80 px-4 py-3 wrap-break-word text-foreground">
           <MessagePrimitive.Parts />
         </div>
         <div className="aui-user-action-bar-wrapper absolute top-1/2 left-0 -translate-x-full -translate-y-1/2 pr-2">

@@ -1,13 +1,20 @@
 import { type UIMessage } from "ai";
 import { cookies } from "next/headers";
 import { freestyle } from "freestyle-sandboxes";
-import { createTools as createVmTools } from "@/lib/create-tools";
+import { createTools as createBaseTools } from "@/lib/create-tools";
 import { streamLlmResponse } from "@/lib/llm-provider";
 import { adorableVmSpec } from "@/lib/adorable-vm";
 import { getOrCreateIdentitySession } from "@/lib/identity-session";
 import { readRepoMetadata, saveConversationMessages } from "@/lib/repo-storage";
-import { SYSTEM_PROMPT } from "@/lib/system-prompt";
+import { buildSystemPrompt, SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { getClaudeAccessToken } from "@/lib/claude-auth";
+import {
+  getToolsForPhase,
+  detectPhase,
+  getProjectMemoryState,
+  readSpec,
+} from "@/lib/buildforge";
+import type { BuildForgeContext } from "@/lib/buildforge";
 
 export async function POST(req: Request) {
   const payload = (await req.json()) as {
@@ -58,10 +65,51 @@ export async function POST(req: Request) {
     spec: adorableVmSpec,
   });
 
-  const tools = createVmTools(vm, {
+  // Create base tools (original 13)
+  const baseTools = createBaseTools(vm, {
     sourceRepoId: metadata.sourceRepoId,
     metadataRepoId: repoId,
   });
+
+  // Load BuildForge context and tools
+  let buildForgeTools = {};
+  try {
+    const projectMemory = await getProjectMemoryState(vm);
+    const currentSpec = await readSpec(vm);
+
+    const bfContext: BuildForgeContext = {
+      vm,
+      sourceRepoId: metadata.sourceRepoId,
+      metadataRepoId: repoId,
+      projectMemory,
+      currentSpec,
+      activePlan: null,
+    };
+
+    // Detect phase and get appropriate tools
+    const phase = detectPhase(bfContext);
+    buildForgeTools = getToolsForPhase(phase, vm, bfContext);
+  } catch (e) {
+    // If BuildForge tools fail to load, continue with base tools only
+    console.error("BuildForge tools initialization failed:", e);
+  }
+
+  // Merge base tools with BuildForge tools
+  const tools = { ...baseTools, ...buildForgeTools };
+
+  // Build dynamic system prompt with project context
+  const latestUserMessage = messages
+    .filter((m) => m.role === "user")
+    .pop()
+    ?.parts?.find((p) => p.type === "text");
+  const userText = latestUserMessage && "text" in latestUserMessage ? latestUserMessage.text : "";
+
+  let systemPrompt: string;
+  try {
+    systemPrompt = await buildSystemPrompt(vm, userText);
+  } catch {
+    systemPrompt = SYSTEM_PROMPT;
+  }
 
   // Read user-provided API key from cookie (if no global env key)
   const jar = await cookies();
@@ -94,18 +142,15 @@ export async function POST(req: Request) {
   } = {};
 
   if (hasGlobalKey) {
-    // Use global env key (default behavior)
     llmOptions = {};
   } else if (userApiKey) {
-    // Use user-provided API key
     llmOptions = { apiKey: userApiKey, providerOverride: userProvider };
   } else if (hasClaudeCode) {
-    // Use Claude Code OAuth token
     llmOptions = { providerOverride: "claude-code" };
   }
 
   const llm = await streamLlmResponse({
-    system: SYSTEM_PROMPT,
+    system: systemPrompt,
     messages,
     tools,
     ...llmOptions,

@@ -138,4 +138,33 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Smooth scrollbar styling */
+  .aui-thread-viewport {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.4 0 0 / 20%) transparent;
+  }
+
+  .aui-thread-viewport::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .aui-thread-viewport::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .aui-thread-viewport::-webkit-scrollbar-thumb {
+    background: oklch(0.4 0 0 / 20%);
+    border-radius: 3px;
+  }
+
+  .aui-thread-viewport::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.4 0 0 / 35%);
+  }
+
+  /* Iframe smooth rendering */
+  iframe {
+    border: none;
+    color-scheme: normal;
+  }
 }
