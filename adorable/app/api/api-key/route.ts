@@ -1,5 +1,9 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import {
+  getClaudeAuthStatus,
+  getClaudeAccessToken,
+} from "@/lib/claude-auth";
 
 const COOKIE_NAME = "user-api-key";
 const COOKIE_PROVIDER = "user-api-provider";
@@ -15,9 +19,17 @@ export async function GET() {
   const userKey = jar.get(COOKIE_NAME)?.value;
   const userProvider = jar.get(COOKIE_PROVIDER)?.value ?? "openai";
 
+  // Check Claude Code auth
+  const claudeStatus = await getClaudeAuthStatus();
+  const claudeToken = await getClaudeAccessToken();
+  const hasClaudeCode = claudeStatus.authenticated && !!claudeToken;
+
   return NextResponse.json({
     hasGlobalKey: hasGlobalKey(),
     hasUserKey: !!userKey,
+    hasClaudeCode,
+    claudeEmail: claudeStatus.email ?? null,
+    claudeSubscription: claudeStatus.subscriptionType ?? null,
     provider: userProvider,
   });
 }
