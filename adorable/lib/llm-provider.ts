@@ -10,11 +10,13 @@ import {
   type ToolSet,
   convertToModelMessages,
 } from "ai";
+import { getClaudeAccessToken } from "@/lib/claude-auth";
 
-type LlmProviderName = "openai" | "anthropic";
+type LlmProviderName = "openai" | "anthropic" | "claude-code";
 
 const getProviderName = (override?: string): LlmProviderName => {
   const value = (override ?? process.env["LLM_PROVIDER"])?.toLowerCase().trim();
+  if (value === "claude-code") return "claude-code";
   if (value === "anthropic" || value === "claude") return "anthropic";
   return "openai";
 };
@@ -63,8 +65,22 @@ export const streamLlmResponse = async ({
     };
   }
 
-  const anthropicProvider = apiKey
-    ? createAnthropic({ apiKey })
+  // Both "anthropic" (direct API key) and "claude-code" (OAuth token) use the
+  // Anthropic SDK — the only difference is the source of the key.
+  let effectiveKey = apiKey;
+
+  if (provider === "claude-code") {
+    const token = await getClaudeAccessToken();
+    if (!token) {
+      throw new Error(
+        "Claude Code is not authenticated. Please run 'claude auth login' or sign in from the app.",
+      );
+    }
+    effectiveKey = token;
+  }
+
+  const anthropicProvider = effectiveKey
+    ? createAnthropic({ apiKey: effectiveKey })
     : createAnthropic({});
   const result = streamText({
     system,

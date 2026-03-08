@@ -7,6 +7,7 @@ import { adorableVmSpec } from "@/lib/adorable-vm";
 import { getOrCreateIdentitySession } from "@/lib/identity-session";
 import { readRepoMetadata, saveConversationMessages } from "@/lib/repo-storage";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt";
+import { getClaudeAccessToken } from "@/lib/claude-auth";
 
 export async function POST(req: Request) {
   const payload = (await req.json()) as {
@@ -71,22 +72,43 @@ export async function POST(req: Request) {
     process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY
   );
 
-  // If no global key and no user key, reject
-  if (!hasGlobalKey && !userApiKey) {
+  // Check Claude Code auth as fallback
+  const claudeToken = await getClaudeAccessToken();
+  const hasClaudeCode = !!claudeToken;
+
+  // If no global key and no user key and no Claude Code auth, reject
+  if (!hasGlobalKey && !userApiKey && !hasClaudeCode) {
     return Response.json(
-      { error: "No API key configured. Please add your API key in settings." },
+      {
+        error:
+          "No API key configured. Please sign in with Claude or add your API key in settings.",
+      },
       { status: 401 },
     );
+  }
+
+  // Priority: global env key > user cookie key > Claude Code OAuth token
+  let llmOptions: {
+    apiKey?: string;
+    providerOverride?: string;
+  } = {};
+
+  if (hasGlobalKey) {
+    // Use global env key (default behavior)
+    llmOptions = {};
+  } else if (userApiKey) {
+    // Use user-provided API key
+    llmOptions = { apiKey: userApiKey, providerOverride: userProvider };
+  } else if (hasClaudeCode) {
+    // Use Claude Code OAuth token
+    llmOptions = { providerOverride: "claude-code" };
   }
 
   const llm = await streamLlmResponse({
     system: SYSTEM_PROMPT,
     messages,
     tools,
-    // Only pass user key if there's no global key
-    ...(hasGlobalKey
-      ? {}
-      : { apiKey: userApiKey, providerOverride: userProvider }),
+    ...llmOptions,
   });
 
   return llm.result.toUIMessageStreamResponse({
