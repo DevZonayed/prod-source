@@ -60,7 +60,12 @@ export const getToolsForPhase = (
   const categories = PHASE_TOOL_CATEGORIES[phase];
   const tools: ToolSet = {};
 
-  for (const category of categories) {
+  // Always include project-init, spec-engine, and memory-context tools
+  // so the LLM can initialize AND generate code in the same turn.
+  const alwaysInclude: ToolCategory[] = ["project-init", "spec-engine", "memory-context"];
+  const allCategories = new Set([...categories, ...alwaysInclude]);
+
+  for (const category of allCategories) {
     if (category === "base") continue; // Base tools added separately
     const categoryTools = getToolsByCategory(category, vm, ctx);
     Object.assign(tools, categoryTools);
@@ -96,15 +101,11 @@ export const getAllBuildForgeTools = (
 
 /**
  * Detect the current development phase from context.
+ * Always includes generation tools so the LLM can write code immediately
+ * without being blocked by initialization ceremony.
  */
 export const detectPhase = (ctx: BuildForgeContext): ToolPhase => {
-  // No memory = initialization needed
-  if (!ctx.projectMemory.initialized) return "initialization";
-
-  // Has spec but no active plan = ready for specification/planning
-  if (ctx.currentSpec && !ctx.activePlan) return "specification";
-
-  // Active plan = generation phase
+  // Active plan with all tasks done = validation
   if (ctx.activePlan) {
     const allDone = ctx.activePlan.tasks.every(
       (t) => t.status === "completed" || t.status === "skipped",
@@ -113,6 +114,9 @@ export const detectPhase = (ctx: BuildForgeContext): ToolPhase => {
     return "generation";
   }
 
-  // Default to generation (most common phase)
+  // Default to generation — always give the LLM the ability to write code.
+  // Init and spec tools are still available via the merged base tools.
+  // This prevents the LLM from being stuck in "initialization" phase
+  // unable to write any code for simple tasks like landing pages.
   return "generation";
 };

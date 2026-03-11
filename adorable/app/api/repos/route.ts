@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 import { freestyle } from "freestyle-sandboxes";
 import { TEMPLATE_REPO } from "@/lib/vars";
 import { createVmForRepo } from "@/lib/adorable-vm";
+import { adorableVmSpec } from "@/lib/adorable-vm";
 import { getOrCreateIdentitySession } from "@/lib/identity-session";
+import { upgradeNextjs } from "@/lib/upgrade-dependencies";
 import {
   ADORABLE_WRAPPER_REPO_PREFIX,
   type RepoMetadata,
@@ -181,6 +183,12 @@ export async function POST(req: Request) {
 
   await identity.permissions.vms.grant({
     vmId: vm.vmId,
+  });
+
+  // Upgrade Next.js to latest version in background (don't block repo creation)
+  const vmRef = freestyle.vms.ref({ vmId: vm.vmId, spec: adorableVmSpec });
+  void upgradeNextjs(vmRef).catch((err) => {
+    console.error("Next.js auto-upgrade failed:", err);
   });
 
   const initialMetadata: RepoMetadata = {

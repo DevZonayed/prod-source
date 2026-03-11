@@ -1,20 +1,23 @@
 import { type UIMessage } from "ai";
 import { cookies } from "next/headers";
 import { freestyle } from "freestyle-sandboxes";
-import { createTools as createBaseTools } from "@/lib/create-tools";
-import { streamLlmResponse } from "@/lib/llm-provider";
 import { adorableVmSpec } from "@/lib/adorable-vm";
 import { getOrCreateIdentitySession } from "@/lib/identity-session";
 import { readRepoMetadata, saveConversationMessages } from "@/lib/repo-storage";
-import { buildSystemPrompt, SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { getClaudeAccessToken } from "@/lib/claude-auth";
-import {
-  getToolsForPhase,
-  detectPhase,
-  getProjectMemoryState,
-  readSpec,
-} from "@/lib/buildforge";
+
+// ─── CodeMine (new agentic engine) ───
+import { createCodeMineTools, runAgenticLoop, buildCodeMinePrompt, CODEMINE_SYSTEM_PROMPT } from "@/lib/codemine";
+import type { AgenticLoopState } from "@/lib/codemine";
+
+// ─── BuildForge (legacy, kept for backward compat) ───
+import { createTools as createBaseTools } from "@/lib/create-tools";
+import { streamLlmResponse } from "@/lib/llm-provider";
+import { buildSystemPrompt, SYSTEM_PROMPT } from "@/lib/system-prompt";
+import { getToolsForPhase, detectPhase, getProjectMemoryState, readSpec } from "@/lib/buildforge";
 import type { BuildForgeContext } from "@/lib/buildforge";
+
+const AGENT_MODE = (process.env["AGENT_MODE"] ?? "codemine").toLowerCase();
 
 export async function POST(req: Request) {
   const payload = (await req.json()) as {
@@ -24,9 +27,7 @@ export async function POST(req: Request) {
   };
 
   const { repoId, conversationId } = payload;
-  const messages = Array.isArray(payload.messages)
-    ? payload.messages
-    : undefined;
+  const messages = Array.isArray(payload.messages) ? payload.messages : undefined;
 
   if (!repoId || !conversationId) {
     return Response.json(
@@ -42,6 +43,7 @@ export async function POST(req: Request) {
     );
   }
 
+  // ─── Auth & Access ───
   const { identity } = await getOrCreateIdentitySession();
   const { repositories } = await identity.permissions.git.list({ limit: 200 });
   const hasAccess = repositories.some((repo) => repo.id === repoId);
@@ -65,13 +67,127 @@ export async function POST(req: Request) {
     spec: adorableVmSpec,
   });
 
-  // Create base tools (original 13)
+  // ─── LLM Auth (shared by both modes) ───
+  const jar = await cookies();
+  const userApiKey = jar.get("user-api-key")?.value;
+  const userProvider = jar.get("user-api-provider")?.value;
+
+  const hasGlobalKey = !!(
+    process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY
+  );
+
+  const envProvider = process.env["LLM_PROVIDER"]?.toLowerCase().trim();
+  const envForcesClaudeCode = envProvider === "claude-code";
+
+  const claudeToken = await getClaudeAccessToken();
+  const hasClaudeCode = !!claudeToken;
+
+  if (!hasGlobalKey && !userApiKey && !hasClaudeCode) {
+    return Response.json(
+      {
+        error:
+          "No API key configured. Please sign in with Claude or add your API key in settings.",
+      },
+      { status: 401 },
+    );
+  }
+
+  let llmOptions: { apiKey?: string; providerOverride?: string } = {};
+
+  if (envForcesClaudeCode && hasClaudeCode) {
+    llmOptions = { providerOverride: "claude-code" };
+  } else if (hasGlobalKey) {
+    llmOptions = {};
+  } else if (userApiKey) {
+    llmOptions = { apiKey: userApiKey, providerOverride: userProvider };
+  } else if (hasClaudeCode) {
+    llmOptions = { providerOverride: "claude-code" };
+  }
+
+  console.log("[LLM Auth]", {
+    agentMode: AGENT_MODE,
+    envProvider,
+    hasGlobalKey,
+    hasUserCookie: !!userApiKey,
+    hasClaudeCode,
+    chosenPath: llmOptions.providerOverride ?? (hasGlobalKey ? "global-env" : "unknown"),
+  });
+
+  // ─── Extract latest user message ───
+  const latestUserMessage = messages
+    .filter((m) => m.role === "user")
+    .pop()
+    ?.parts?.find((p) => p.type === "text");
+  const userText =
+    latestUserMessage && "text" in latestUserMessage
+      ? latestUserMessage.text
+      : "";
+
+  // ═══════════════════════════════════════
+  // CodeMine Agentic Engine (default)
+  // ═══════════════════════════════════════
+  if (AGENT_MODE === "codemine") {
+    // Build CodeMine tools with shared loop state
+    const loopState: AgenticLoopState = {
+      stepCount: 0,
+      taskState: null,
+      recentFiles: [],
+      backgroundProcesses: new Map(),
+      conversationId,
+      pauseForUser: false,
+      startedAt: Date.now(),
+    };
+
+    const tools = createCodeMineTools(vm, loopState, {
+      sourceRepoId: metadata.sourceRepoId,
+      metadataRepoId: repoId,
+      previewUrl: metadata.vm.previewUrl,
+    });
+
+    // Build system prompt
+    let systemPrompt: string;
+    try {
+      systemPrompt = await buildCodeMinePrompt(vm, userText);
+    } catch {
+      systemPrompt = CODEMINE_SYSTEM_PROMPT;
+    }
+
+    // Run the agentic loop
+    const result = await runAgenticLoop({
+      system: systemPrompt,
+      messages,
+      tools,
+      vm,
+      conversationId,
+      previewUrl: metadata.vm.previewUrl,
+      ...llmOptions,
+    });
+
+    return result.toUIMessageStreamResponse({
+      sendReasoning: true,
+      originalMessages: messages,
+      generateMessageId: () => crypto.randomUUID(),
+      onFinish: async ({ messages: finalMessages }) => {
+        const latestMetadata = await readRepoMetadata(repoId);
+        if (!latestMetadata) return;
+        await saveConversationMessages(
+          repoId,
+          latestMetadata,
+          conversationId,
+          finalMessages,
+        );
+      },
+    });
+  }
+
+  // ═══════════════════════════════════════
+  // BuildForge Legacy Mode (AGENT_MODE=buildforge)
+  // ═══════════════════════════════════════
   const baseTools = createBaseTools(vm, {
     sourceRepoId: metadata.sourceRepoId,
     metadataRepoId: repoId,
   });
 
-  // Load BuildForge context and tools
   let buildForgeTools = {};
   try {
     const projectMemory = await getProjectMemoryState(vm);
@@ -86,71 +202,23 @@ export async function POST(req: Request) {
       activePlan: null,
     };
 
-    // Detect phase and get appropriate tools
     const phase = detectPhase(bfContext);
     buildForgeTools = getToolsForPhase(phase, vm, bfContext);
   } catch (e) {
-    // If BuildForge tools fail to load, continue with base tools only
     console.error("BuildForge tools initialization failed:", e);
   }
 
-  // Merge base tools with BuildForge tools
   const tools = { ...baseTools, ...buildForgeTools };
 
-  // Build dynamic system prompt with project context
-  const latestUserMessage = messages
-    .filter((m) => m.role === "user")
-    .pop()
-    ?.parts?.find((p) => p.type === "text");
-  const userText = latestUserMessage && "text" in latestUserMessage ? latestUserMessage.text : "";
-
-  let systemPrompt: string;
+  let systemPromptLegacy: string;
   try {
-    systemPrompt = await buildSystemPrompt(vm, userText);
+    systemPromptLegacy = await buildSystemPrompt(vm, userText);
   } catch {
-    systemPrompt = SYSTEM_PROMPT;
-  }
-
-  // Read user-provided API key from cookie (if no global env key)
-  const jar = await cookies();
-  const userApiKey = jar.get("user-api-key")?.value;
-  const userProvider = jar.get("user-api-provider")?.value;
-
-  const hasGlobalKey = !!(
-    process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY
-  );
-
-  // Check Claude Code auth as fallback
-  const claudeToken = await getClaudeAccessToken();
-  const hasClaudeCode = !!claudeToken;
-
-  // If no global key and no user key and no Claude Code auth, reject
-  if (!hasGlobalKey && !userApiKey && !hasClaudeCode) {
-    return Response.json(
-      {
-        error:
-          "No API key configured. Please sign in with Claude or add your API key in settings.",
-      },
-      { status: 401 },
-    );
-  }
-
-  // Priority: global env key > user cookie key > Claude Code OAuth token
-  let llmOptions: {
-    apiKey?: string;
-    providerOverride?: string;
-  } = {};
-
-  if (hasGlobalKey) {
-    llmOptions = {};
-  } else if (userApiKey) {
-    llmOptions = { apiKey: userApiKey, providerOverride: userProvider };
-  } else if (hasClaudeCode) {
-    llmOptions = { providerOverride: "claude-code" };
+    systemPromptLegacy = SYSTEM_PROMPT;
   }
 
   const llm = await streamLlmResponse({
-    system: systemPrompt,
+    system: systemPromptLegacy,
     messages,
     tools,
     ...llmOptions,

@@ -8,12 +8,13 @@ import { z } from "zod";
 import type { Vm } from "freestyle-sandboxes";
 import type { BuildForgeContext } from "../../types";
 import { runVmCommand, WORKDIR } from "../base";
+import { upgradeNextjs, upgradeNestjs } from "../../../upgrade-dependencies";
 
 export const createProjectInitTools = (
   vm: Vm,
   ctx: BuildForgeContext,
 ): ToolSet => ({
-  "project.scaffold": tool({
+  "project_scaffold": tool({
     description:
       "Scaffold the project folder structure based on the specification. Creates directories for pages, components, lib, api routes, types, etc.",
     inputSchema: z.object({
@@ -28,7 +29,7 @@ export const createProjectInitTools = (
     },
   }),
 
-  "project.install_deps": tool({
+  "project_install_deps": tool({
     description:
       "Install npm dependencies in the workspace. Can install specific packages or run npm install.",
     inputSchema: z.object({
@@ -44,7 +45,7 @@ export const createProjectInitTools = (
     },
   }),
 
-  "project.configure_env": tool({
+  "project_configure_env": tool({
     description:
       "Create or update environment files (.env, .env.local, .env.example) with configuration values.",
     inputSchema: z.object({
@@ -60,7 +61,7 @@ export const createProjectInitTools = (
     },
   }),
 
-  "project.validate_structure": tool({
+  "project_validate_structure": tool({
     description:
       "Validate the project folder structure against the expected pattern. Checks for missing required files.",
     inputSchema: z.object({
@@ -88,7 +89,63 @@ export const createProjectInitTools = (
     },
   }),
 
-  "project.status": tool({
+  "project_upgrade_deps": tool({
+    description:
+      "Upgrade Next.js (and NestJS if present) to the latest versions. Call this if the project is using outdated framework versions. Upgrades next, react, react-dom and their types together for compatibility.",
+    inputSchema: z.object({
+      upgradeNest: z.boolean().default(false).describe("Also upgrade NestJS packages if they exist in the project."),
+    }),
+    execute: async ({ upgradeNest }) => {
+      const nextResult = await upgradeNextjs(vm);
+      let nestResult = null;
+      if (upgradeNest) {
+        nestResult = await upgradeNestjs(vm);
+      }
+      return {
+        ok: nextResult.ok,
+        nextjs: nextResult,
+        nestjs: nestResult,
+      };
+    },
+  }),
+
+  "project_add_nestjs": tool({
+    description:
+      "Add NestJS backend to the project. Creates a NestJS app alongside the existing Next.js frontend. Only use this when the project requires a dedicated backend (auth, database, complex APIs). Installs latest NestJS packages.",
+    inputSchema: z.object({
+      features: z.array(z.string()).optional().describe("Additional NestJS packages to install (e.g., '@nestjs/typeorm', '@nestjs/jwt', '@nestjs/passport')."),
+    }),
+    execute: async ({ features }) => {
+      // Install NestJS core packages at latest
+      const corePackages = [
+        "@nestjs/core@latest",
+        "@nestjs/common@latest",
+        "@nestjs/platform-express@latest",
+        "@nestjs/cli@latest",
+        "reflect-metadata",
+        "rxjs",
+      ];
+      const devPackages = [
+        "@nestjs/testing@latest",
+        "@nestjs/schematics@latest",
+      ];
+      const featurePackages = (features ?? []).map((f) =>
+        f.includes("@") && !f.includes("@latest") && !f.includes("@^") ? `${f}@latest` : f
+      );
+
+      const installCmd = `cd ${WORKDIR} && npm install ${[...corePackages, ...featurePackages].join(" ")} && npm install -D ${devPackages.join(" ")}`;
+      const result = await runVmCommand(vm, installCmd);
+
+      return {
+        ok: result.ok,
+        installed: [...corePackages, ...featurePackages, ...devPackages],
+        stdout: result.stdout.slice(-300),
+        stderr: result.stderr.slice(-200),
+      };
+    },
+  }),
+
+  "project_status": tool({
     description:
       "Get comprehensive project status: git status, running processes, dependency state.",
     inputSchema: z.object({}),

@@ -14,7 +14,7 @@ const taskId = (prefix: string, index: number): string =>
 /**
  * Decompose a feature description into ordered tasks.
  * This provides a structural decomposition. The LLM enriches it
- * with specific details via the think.decompose tool.
+ * with specific details via the think_decompose tool.
  */
 export const decompose = (
   featureDescription: string,
@@ -56,7 +56,7 @@ export const decompose = (
   // Generate tasks based on scope
   if (scope === "full-feature" || scope === "single-page") {
     // 1. Memory check/update
-    tasks.push(createTask(taskId(prefix, idx++), "general", "Read project memory for relevant context", "memory.read", involvedEntities, []));
+    tasks.push(createTask(taskId(prefix, idx++), "general", "Read project memory for relevant context", "memory_read", involvedEntities, []));
 
     // 2. Entity/model tasks
     for (const entity of involvedEntities) {
@@ -65,7 +65,7 @@ export const decompose = (
           taskId(prefix, idx++),
           "backend_model",
           `Create/update data model for ${entity}`,
-          "backend.model",
+          "backend_model",
           [entity],
           [],
           [tasks[0]?.id].filter(Boolean),
@@ -85,7 +85,7 @@ export const decompose = (
           taskId(prefix, idx++),
           "backend_api",
           `Create API endpoints for ${entity}`,
-          "backend.api_route",
+          "backend_api_route",
           [entity],
           [],
           modelTask ? [modelTask.id] : [],
@@ -101,7 +101,7 @@ export const decompose = (
           taskId(prefix, idx++),
           "frontend_page",
           `Build ${screen} page`,
-          "frontend.page",
+          "frontend_page",
           involvedEntities,
           [screen],
           relatedApiTasks.map((t) => t.id),
@@ -117,7 +117,7 @@ export const decompose = (
           taskId(prefix, idx++),
           "frontend_page",
           `Build UI for ${featureDescription}`,
-          "frontend.page",
+          "frontend_page",
           involvedEntities,
           [],
           relatedApiTasks.map((t) => t.id),
@@ -131,7 +131,7 @@ export const decompose = (
         taskId(prefix, idx++),
         "general",
         "Validate all generated code (TypeScript + runtime check)",
-        "think.validate",
+        "think_validate",
         [],
         [],
         tasks.filter((t) => t.type !== "general").map((t) => t.id),
@@ -144,38 +144,38 @@ export const decompose = (
         taskId(prefix, idx++),
         "general",
         "Update project memory with new components, endpoints, and patterns",
-        "memory.write",
+        "memory_write",
         involvedEntities,
         involvedScreens,
         [tasks[tasks.length - 1].id],
       ),
     );
   } else if (scope === "component") {
-    tasks.push(createTask(taskId(prefix, idx++), "general", "Read component patterns from memory", "memory.read", involvedEntities, []));
+    tasks.push(createTask(taskId(prefix, idx++), "general", "Read component patterns from memory", "memory_read", involvedEntities, []));
     tasks.push(
-      createTask(taskId(prefix, idx++), "frontend_component", `Build component: ${featureDescription}`, "frontend.component", involvedEntities, [], [tasks[0].id]),
+      createTask(taskId(prefix, idx++), "frontend_component", `Build component: ${featureDescription}`, "frontend_component", involvedEntities, [], [tasks[0].id]),
     );
     tasks.push(
-      createTask(taskId(prefix, idx++), "general", "Validate component", "think.validate", [], [], [tasks[1].id]),
+      createTask(taskId(prefix, idx++), "general", "Validate component", "think_validate", [], [], [tasks[1].id]),
     );
   } else if (scope === "api-endpoint") {
-    tasks.push(createTask(taskId(prefix, idx++), "general", "Read API patterns from memory", "memory.read", involvedEntities, []));
+    tasks.push(createTask(taskId(prefix, idx++), "general", "Read API patterns from memory", "memory_read", involvedEntities, []));
     tasks.push(
-      createTask(taskId(prefix, idx++), "backend_api", `Build API: ${featureDescription}`, "backend.api_route", involvedEntities, [], [tasks[0].id]),
+      createTask(taskId(prefix, idx++), "backend_api", `Build API: ${featureDescription}`, "backend_api_route", involvedEntities, [], [tasks[0].id]),
     );
     tasks.push(
-      createTask(taskId(prefix, idx++), "general", "Validate API endpoint", "think.validate", [], [], [tasks[1].id]),
+      createTask(taskId(prefix, idx++), "general", "Validate API endpoint", "think_validate", [], [], [tasks[1].id]),
     );
   } else if (scope === "bug-fix") {
-    tasks.push(createTask(taskId(prefix, idx++), "general", "Read issues-resolved memory", "memory.read", [], []));
+    tasks.push(createTask(taskId(prefix, idx++), "general", "Read issues-resolved memory", "memory_read", [], []));
     tasks.push(
       createTask(taskId(prefix, idx++), "general", `Diagnose and fix: ${featureDescription}`, "bashTool", [], [], [tasks[0].id]),
     );
     tasks.push(
-      createTask(taskId(prefix, idx++), "general", "Validate fix", "think.validate", [], [], [tasks[1].id]),
+      createTask(taskId(prefix, idx++), "general", "Validate fix", "think_validate", [], [], [tasks[1].id]),
     );
     tasks.push(
-      createTask(taskId(prefix, idx++), "general", "Log resolution to issues-resolved memory", "memory.write", [], [], [tasks[2].id]),
+      createTask(taskId(prefix, idx++), "general", "Log resolution to issues-resolved memory", "memory_write", [], [], [tasks[2].id]),
     );
   }
 

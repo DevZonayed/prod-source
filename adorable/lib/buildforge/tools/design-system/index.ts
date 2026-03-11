@@ -14,7 +14,7 @@ export const createDesignSystemTools = (
   vm: Vm,
   ctx: BuildForgeContext,
 ): ToolSet => ({
-  "design.tokens": tool({
+  "design_tokens": tool({
     description:
       "Define design tokens (colors, typography, spacing, borders). Updates the ui-patterns memory and CSS variables.",
     inputSchema: z.object({
@@ -45,7 +45,7 @@ export const createDesignSystemTools = (
     },
   }),
 
-  "design.layout_pattern": tool({
+  "design_layout_pattern": tool({
     description:
       "Register a layout pattern (dashboard, public, auth, admin) for consistent page structure.",
     inputSchema: z.object({
@@ -66,7 +66,7 @@ export const createDesignSystemTools = (
     },
   }),
 
-  "design.component_pattern": tool({
+  "design_component_pattern": tool({
     description:
       "Register a reusable UI component pattern (DataTable, EntityForm, DetailView, etc.).",
     inputSchema: z.object({
@@ -81,7 +81,7 @@ export const createDesignSystemTools = (
     },
   }),
 
-  "design.responsive_rules": tool({
+  "design_responsive_rules": tool({
     description:
       "Define responsive design rules (breakpoint behaviors, mobile adaptations).",
     inputSchema: z.object({
@@ -93,7 +93,7 @@ export const createDesignSystemTools = (
     },
   }),
 
-  "design.consistency_check": tool({
+  "design_consistency_check": tool({
     description:
       "Check UI consistency by reviewing what components and patterns are registered in memory vs what exists in code.",
     inputSchema: z.object({}),

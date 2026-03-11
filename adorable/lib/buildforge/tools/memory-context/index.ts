@@ -30,7 +30,7 @@ export const createMemoryContextTools = (
   vm: Vm,
   ctx: BuildForgeContext,
 ): ToolSet => ({
-  "memory.init": tool({
+  "memory_init": tool({
     description:
       "Initialize BuildForge project memory system. Creates .buildforge/memory/ with all template files. Call this first for new projects.",
     inputSchema: z.object({
@@ -47,7 +47,7 @@ export const createMemoryContextTools = (
     },
   }),
 
-  "memory.read": tool({
+  "memory_read": tool({
     description:
       "Read a specific project memory file. Returns the full content of the memory file.",
     inputSchema: z.object({
@@ -61,7 +61,7 @@ export const createMemoryContextTools = (
     },
   }),
 
-  "memory.read_section": tool({
+  "memory_read_section": tool({
     description:
       "Read a specific section from a memory file by its heading. More precise than reading the full file.",
     inputSchema: z.object({
@@ -74,7 +74,7 @@ export const createMemoryContextTools = (
     },
   }),
 
-  "memory.write": tool({
+  "memory_write": tool({
     description:
       "Write/replace the full content of a project memory file. Use for major updates.",
     inputSchema: z.object({
@@ -87,7 +87,7 @@ export const createMemoryContextTools = (
     },
   }),
 
-  "memory.update_section": tool({
+  "memory_update_section": tool({
     description:
       "Update a specific section within a memory file. If the section doesn't exist, it's appended.",
     inputSchema: z.object({
@@ -101,7 +101,7 @@ export const createMemoryContextTools = (
     },
   }),
 
-  "memory.append": tool({
+  "memory_append": tool({
     description:
       "Append an entry to a memory file (useful for changelog, issues-resolved). Adds timestamp automatically.",
     inputSchema: z.object({
@@ -114,7 +114,7 @@ export const createMemoryContextTools = (
     },
   }),
 
-  "memory.search": tool({
+  "memory_search": tool({
     description:
       "Search across all project memory files for a keyword or phrase. Returns matching sections with context.",
     inputSchema: z.object({
@@ -135,7 +135,7 @@ export const createMemoryContextTools = (
     },
   }),
 
-  "memory.status": tool({
+  "memory_status": tool({
     description:
       "Get the current status of the project memory system. Shows which files exist and if spec is loaded.",
     inputSchema: z.object({}),
@@ -156,7 +156,7 @@ export const createMemoryContextTools = (
     },
   }),
 
-  "memory.log_decision": tool({
+  "memory_log_decision": tool({
     description:
       "Record an architectural decision in the decisions memory. Important for maintaining consistency across sessions.",
     inputSchema: z.object({
@@ -181,7 +181,7 @@ export const createMemoryContextTools = (
     },
   }),
 
-  "memory.log_issue": tool({
+  "memory_log_issue": tool({
     description:
       "Record a resolved issue in the issues-resolved memory. Helps prevent the same mistake in future.",
     inputSchema: z.object({

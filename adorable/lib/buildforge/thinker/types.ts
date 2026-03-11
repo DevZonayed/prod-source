@@ -57,7 +57,7 @@ export const planInputSchema = z.object({
 });
 
 /**
- * Validation input (from think.validate).
+ * Validation input (from think_validate).
  */
 export const validateInputSchema = z.object({
   taskId: z.string().describe("ID of the task to validate."),

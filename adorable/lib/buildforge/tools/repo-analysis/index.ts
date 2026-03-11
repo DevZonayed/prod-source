@@ -13,7 +13,7 @@ export const createRepoAnalysisTools = (
   vm: Vm,
   ctx: BuildForgeContext,
 ): ToolSet => ({
-  "repo.scan": tool({
+  "repo_scan": tool({
     description:
       "Full repository scan: identifies tech stack, folder structure, file count, dependencies. Creates a project fingerprint.",
     inputSchema: z.object({}),
@@ -55,7 +55,7 @@ export const createRepoAnalysisTools = (
     },
   }),
 
-  "repo.analyze_routes": tool({
+  "repo_analyze_routes": tool({
     description:
       "Analyze the Next.js App Router structure: discover all routes, pages, layouts, and API routes.",
     inputSchema: z.object({}),
@@ -75,7 +75,7 @@ export const createRepoAnalysisTools = (
     },
   }),
 
-  "repo.extract_components": tool({
+  "repo_extract_components": tool({
     description:
       "Extract all React components from the codebase: find exported components, their props, and file paths.",
     inputSchema: z.object({
@@ -100,7 +100,7 @@ export const createRepoAnalysisTools = (
     },
   }),
 
-  "repo.dependency_map": tool({
+  "repo_dependency_map": tool({
     description:
       "Analyze import dependencies between files to understand module coupling.",
     inputSchema: z.object({

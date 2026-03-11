@@ -70,6 +70,7 @@ export const readVmFile = async (
 
 /**
  * Write a file to the VM workspace.
+ * Skips the write if the file already has identical content (deduplication).
  */
 export const writeVmFile = async (
   vm: Vm,
@@ -79,6 +80,15 @@ export const writeVmFile = async (
   const safePath = normalizeRelativePath(relativePath);
   if (!safePath) return false;
   try {
+    // Deduplication: skip write if content is identical
+    try {
+      const existing = await vm.fs.readTextFile(safePath);
+      if (typeof existing === "string" && existing === content) {
+        return true; // File already has this exact content, skip write
+      }
+    } catch {
+      // File doesn't exist yet, proceed with write
+    }
     await vm.fs.writeTextFile(safePath, content);
     return true;
   } catch {

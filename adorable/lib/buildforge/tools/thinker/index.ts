@@ -18,7 +18,7 @@ export const createThinkerTools = (
   vm: Vm,
   ctx: BuildForgeContext,
 ): ToolSet => ({
-  "think.decompose": tool({
+  "think_decompose": tool({
     description:
       "Decompose a feature request into atomic tasks with dependency ordering. Returns a task graph showing what needs to be built and in what order. Call this before starting any multi-step generation work.",
     inputSchema: z.object({
@@ -45,7 +45,7 @@ export const createThinkerTools = (
     },
   }),
 
-  "think.plan": tool({
+  "think_plan": tool({
     description:
       "Create a detailed execution plan from decomposed tasks. Sets up the plan for step-by-step execution.",
     inputSchema: z.object({
@@ -87,7 +87,7 @@ export const createThinkerTools = (
     },
   }),
 
-  "think.validate": tool({
+  "think_validate": tool({
     description:
       "Validate generated code after a task. Runs TypeScript, runtime, and optionally lint/build checks. ALWAYS call this after generating code to ensure quality.",
     inputSchema: z.object({
@@ -103,7 +103,7 @@ export const createThinkerTools = (
     },
   }),
 
-  "think.self_correct": tool({
+  "think_self_correct": tool({
     description:
       "When validation fails, analyze the error and get a correction strategy. Suggests specific actions to fix the issues. Max 3 retries before escalating to user.",
     inputSchema: z.object({
@@ -129,7 +129,7 @@ export const createThinkerTools = (
     },
   }),
 
-  "think.checkpoint": tool({
+  "think_checkpoint": tool({
     description:
       "Create a checkpoint (git commit) of the current state. Use this at milestones so you can rollback if something goes wrong later.",
     inputSchema: z.object({
@@ -144,7 +144,7 @@ export const createThinkerTools = (
     },
   }),
 
-  "think.rollback": tool({
+  "think_rollback": tool({
     description:
       "Rollback to a previous checkpoint. Use when generation goes wrong and you need to start a task over.",
     inputSchema: z.object({
@@ -162,7 +162,7 @@ export const createThinkerTools = (
     },
   }),
 
-  "think.list_checkpoints": tool({
+  "think_list_checkpoints": tool({
     description: "List all BuildForge checkpoints (rollback points).",
     inputSchema: z.object({}),
     execute: async () => {

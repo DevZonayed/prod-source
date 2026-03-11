@@ -21,6 +21,8 @@ import {
   WriteFileToolCard,
 } from "@/components/assistant-ui/tool-cards";
 import { ToolFallback } from "@/components/assistant-ui/tool-fallback";
+import { TaskViewCard } from "@/components/assistant-ui/task-view";
+import { NotifyUserCard } from "@/components/assistant-ui/notify-user-card";
 import {
   groupConsecutiveToolCalls,
   ToolCallGroup,
@@ -178,6 +180,7 @@ const AssistantMessage: FC = () => {
             Group: ToolCallGroup,
             tools: {
               by_name: {
+                // Legacy BuildForge tool names
                 bashTool: BashToolCard,
                 readFileTool: ReadFileToolCard,
                 writeFileTool: WriteFileToolCard,
@@ -191,6 +194,28 @@ const AssistantMessage: FC = () => {
                 commitTool: CommitToolCard,
                 checkAppTool: CheckAppToolCard,
                 devServerLogsTool: DevServerLogsToolCard,
+                // CodeMine tool names
+                view_file: ReadFileToolCard,
+                edit_file: ReplaceInFileToolCard,
+                create_file: WriteFileToolCard,
+                delete_file: DeletePathToolCard,
+                list_dir: ListFilesToolCard,
+                grep_search: SearchFilesToolCard,
+                codebase_search: SearchFilesToolCard,
+                find_by_name: SearchFilesToolCard,
+                run_command: BashToolCard,
+                run_in_background: BashToolCard,
+                read_terminal_output: DevServerLogsToolCard,
+                kill_process: BashToolCard,
+                task_boundary: TaskViewCard,
+                notify_user: NotifyUserCard,
+                git_commit: CommitToolCard,
+                git_diff: ReadFileToolCard,
+                git_log: ReadFileToolCard,
+                git_status: ReadFileToolCard,
+                git_checkout: BashToolCard,
+                git_stash: BashToolCard,
+                get_diagnostics: CheckAppToolCard,
               },
               Fallback: ToolFallback,
             },

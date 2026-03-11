@@ -112,9 +112,9 @@ export const assembleGeneralContext = async (
   parts.push("- Thinker tools: decompose features, plan execution, validate");
   parts.push("- Generation tools: create pages, components, APIs, services");
   parts.push("- Base tools: file operations, bash, commit, deploy");
-  parts.push("\nUse memory.init to initialize project memory if not yet done.");
-  parts.push("Use spec.parse when the user describes a new project or feature.");
-  parts.push("Use think.decompose to break complex features into tasks.");
+  parts.push("\nUse memory_init to initialize project memory if not yet done.");
+  parts.push("Use spec_parse when the user describes a new project or feature.");
+  parts.push("Use think_decompose to break complex features into tasks.");
 
   return parts.join("\n");
 };
@@ -137,8 +137,8 @@ CORE PRINCIPLES:
 5. SELF-VALIDATING: Check your work. Run the app. Fix errors before reporting done.
 
 WORKFLOW:
-- For new projects: spec.parse → memory.init → think.decompose → generate → validate
-- For features: search memory → think.decompose → assemble context → generate → validate → update memory
+- For new projects: spec_parse → memory_init → think_decompose → generate → validate
+- For features: search memory → think_decompose → assemble context → generate → validate → update memory
 - For bug fixes: read issues-resolved memory → diagnose → fix → log the resolution
 - Always commit and push when a task is complete.`);
 

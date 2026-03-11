@@ -15,7 +15,7 @@ export const createFrontendGenTools = (
   vm: Vm,
   ctx: BuildForgeContext,
 ): ToolSet => ({
-  "frontend.page": tool({
+  "frontend_page": tool({
     description:
       "Generate a complete Next.js App Router page. Creates page.tsx and optionally loading.tsx, error.tsx. Updates components memory.",
     inputSchema: z.object({
@@ -52,7 +52,7 @@ export const createFrontendGenTools = (
     },
   }),
 
-  "frontend.component": tool({
+  "frontend_component": tool({
     description:
       "Generate a reusable React component. Creates the component file with TypeScript props. Updates components memory.",
     inputSchema: z.object({
@@ -72,7 +72,7 @@ export const createFrontendGenTools = (
     },
   }),
 
-  "frontend.layout": tool({
+  "frontend_layout": tool({
     description:
       "Generate a Next.js layout component (layout.tsx). Creates root, group, or nested layouts.",
     inputSchema: z.object({
@@ -90,7 +90,7 @@ export const createFrontendGenTools = (
     },
   }),
 
-  "frontend.store": tool({
+  "frontend_store": tool({
     description:
       "Generate a Zustand store with typed state, actions, and selectors.",
     inputSchema: z.object({
@@ -109,7 +109,7 @@ export const createFrontendGenTools = (
     },
   }),
 
-  "frontend.hook": tool({
+  "frontend_hook": tool({
     description:
       "Generate a custom React hook (API hook, utility hook, etc.).",
     inputSchema: z.object({
@@ -123,7 +123,7 @@ export const createFrontendGenTools = (
     },
   }),
 
-  "frontend.types": tool({
+  "frontend_types": tool({
     description:
       "Generate TypeScript type definitions file for entities, DTOs, API responses.",
     inputSchema: z.object({
@@ -136,7 +136,7 @@ export const createFrontendGenTools = (
     },
   }),
 
-  "frontend.api_client": tool({
+  "frontend_api_client": tool({
     description:
       "Generate an API client module for communicating with backend endpoints.",
     inputSchema: z.object({
@@ -154,7 +154,7 @@ export const createFrontendGenTools = (
     },
   }),
 
-  "frontend.design_system": tool({
+  "frontend_design_system": tool({
     description:
       "Initialize or update the design system configuration (tailwind config, CSS variables, theme).",
     inputSchema: z.object({

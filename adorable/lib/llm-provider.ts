@@ -34,6 +34,40 @@ type StreamLlmResponseResult = {
   provider: LlmProviderName;
 };
 
+/**
+ * Returns a model instance for the given provider.
+ * Used by the CodeMine agentic loop to get the model without calling streamText directly.
+ */
+export const getModelForProvider = async (
+  providerOverride?: string,
+  apiKey?: string,
+) => {
+  const provider = getProviderName(providerOverride);
+
+  if (provider === "openai") {
+    const openaiProvider = apiKey
+      ? createOpenAI({ apiKey })
+      : createOpenAI({});
+    return openaiProvider.responses("gpt-5.2-codex");
+  }
+
+  let effectiveKey = apiKey;
+  if (provider === "claude-code") {
+    const token = await getClaudeAccessToken();
+    if (!token) {
+      throw new Error(
+        "Claude Code is not authenticated. Please run 'claude auth login' or sign in from the app.",
+      );
+    }
+    effectiveKey = token;
+  }
+
+  const anthropicProvider = effectiveKey
+    ? createAnthropic({ apiKey: effectiveKey })
+    : createAnthropic({});
+  return anthropicProvider("claude-sonnet-4-20250514");
+};
+
 export const streamLlmResponse = async ({
   system,
   messages,
@@ -65,8 +99,7 @@ export const streamLlmResponse = async ({
     };
   }
 
-  // Both "anthropic" (direct API key) and "claude-code" (OAuth token) use the
-  // Anthropic SDK — the only difference is the source of the key.
+  // Claude Code OAuth tokens (sk-ant-oat01-*) work as x-api-key on Anthropic's API.
   let effectiveKey = apiKey;
 
   if (provider === "claude-code") {

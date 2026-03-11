@@ -38,11 +38,15 @@ export const groupConsecutiveToolCalls: GroupingFunction = (parts) => {
   let currentToolIndices: number[] | null = null;
   let currentToolInfos: ToolInfo[] | null = null;
 
-  // Tools that should never be grouped
+  // Tools that should never be grouped (both legacy and CodeMine names)
   const UNGROUPED_TOOLS = new Set([
     "commitTool",
     "checkAppTool",
     "devServerLogsTool",
+    "task_boundary",
+    "notify_user",
+    "git_commit",
+    "browser_action",
   ]);
 
   for (let i = 0; i < parts.length; i++) {
@@ -103,27 +107,36 @@ const summarize = (tools: ToolInfo[]): string => {
   let singleFile: string | undefined;
 
   for (const t of tools) {
-    const file = typeof t.args.file === "string" ? t.args.file : undefined;
+    const file = typeof t.args.file === "string" ? t.args.file :
+      typeof t.args.AbsolutePath === "string" ? t.args.AbsolutePath : undefined;
     switch (t.toolName) {
       case "readFileTool":
+      case "view_file":
         reads++;
         break;
       case "writeFileTool":
+      case "create_file":
         writes++;
         singleFile ??= file;
         break;
       case "replaceInFileTool":
       case "appendToFileTool":
+      case "edit_file":
         edits++;
         singleFile ??= file;
         break;
       case "searchFilesTool":
+      case "grep_search":
+      case "codebase_search":
+      case "find_by_name":
         searches++;
         break;
       case "listFilesTool":
+      case "list_dir":
         reads++;
         break;
       case "bashTool":
+      case "run_command":
         cmds++;
         break;
       default:
