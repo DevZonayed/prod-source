@@ -27,6 +27,7 @@ export type AgenticLoopParams = {
   previewUrl: string;
   apiKey?: string;
   providerOverride?: string;
+  modelOverride?: string;
 };
 
 /**
@@ -76,6 +77,7 @@ export async function runAgenticLoop(
   const model = await getModelForProvider(
     params.providerOverride,
     params.apiKey,
+    params.modelOverride,
   );
 
   // Convert initial messages

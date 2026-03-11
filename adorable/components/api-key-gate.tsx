@@ -35,7 +35,29 @@ type ApiKeyStatus = {
   claudeEmail: string | null;
   claudeSubscription: string | null;
   provider: Provider;
+  model: string | null;
 };
+
+const OPENAI_MODELS = [
+  { id: "gpt-5.2-codex", label: "GPT-5.2 Codex" },
+  { id: "o4-mini", label: "o4-mini" },
+  { id: "gpt-4.1", label: "GPT-4.1" },
+  { id: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
+];
+
+const ANTHROPIC_MODELS = [
+  { id: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
+  { id: "claude-opus-4-20250514", label: "Claude Opus 4" },
+  { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
+];
+
+function getModelsForProvider(provider: Provider | "claude-code") {
+  return provider === "openai" ? OPENAI_MODELS : ANTHROPIC_MODELS;
+}
+
+function getDefaultModel(provider: Provider | "claude-code") {
+  return provider === "openai" ? "gpt-5.2-codex" : "claude-sonnet-4-20250514";
+}
 
 /* ------------------------------------------------------------------ */
 /*  Gate – shown when no auth is configured anywhere                   */
@@ -61,6 +83,7 @@ export function ApiKeyGate({ children }: { children: React.ReactNode }) {
         claudeEmail: null,
         claudeSubscription: null,
         provider: "openai",
+        model: null,
       });
     } finally {
       setLoading(false);
@@ -470,10 +493,17 @@ export function ApiKeySettingsDialog() {
   const [open, setOpen] = React.useState(false);
   const [status, setStatus] = React.useState<ApiKeyStatus | null>(null);
   const [provider, setProvider] = React.useState<Provider>("openai");
+  const [model, setModel] = React.useState<string>("");
   const [apiKey, setApiKey] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [savingModel, setSavingModel] = React.useState(false);
+
+  // Determine the effective provider for model list (claude-code uses anthropic models)
+  const effectiveProvider: Provider | "claude-code" =
+    status?.hasClaudeCode && !status?.hasUserKey ? "claude-code" : provider;
+  const availableModels = getModelsForProvider(effectiveProvider);
 
   React.useEffect(() => {
     if (!open) return;
@@ -485,6 +515,9 @@ export function ApiKeySettingsDialog() {
         const data = (await res.json()) as ApiKeyStatus;
         setStatus(data);
         setProvider(data.provider);
+        const effectiveProv: Provider | "claude-code" =
+          data.hasClaudeCode && !data.hasUserKey ? "claude-code" : data.provider;
+        setModel(data.model ?? getDefaultModel(effectiveProv));
       }
     })();
   }, [open]);
@@ -508,11 +541,35 @@ export function ApiKeySettingsDialog() {
         setError(data.error ?? "Failed to save");
         return;
       }
+      // Also save model if changed
+      if (model) {
+        await fetch("/api/api-key", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "save-model", model }),
+        });
+      }
       setOpen(false);
     } catch {
       setError("Failed to save API key");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleModelChange = async (newModel: string) => {
+    setModel(newModel);
+    setSavingModel(true);
+    try {
+      await fetch("/api/api-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save-model", model: newModel }),
+      });
+    } catch {
+      // ignore
+    } finally {
+      setSavingModel(false);
     }
   };
 
@@ -598,6 +655,7 @@ export function ApiKeySettingsDialog() {
                 type="button"
                 onClick={() => {
                   setProvider("openai");
+                  setModel(getDefaultModel("openai"));
                   setError(null);
                 }}
                 className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
@@ -612,6 +670,7 @@ export function ApiKeySettingsDialog() {
                 type="button"
                 onClick={() => {
                   setProvider("anthropic");
+                  setModel(getDefaultModel("anthropic"));
                   setError(null);
                 }}
                 className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
@@ -622,6 +681,29 @@ export function ApiKeySettingsDialog() {
               >
                 Anthropic
               </button>
+            </div>
+          </div>
+
+          {/* Model selector */}
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+              Model{savingModel && <span className="ml-1 text-muted-foreground/50">(saving...)</span>}
+            </label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {availableModels.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => void handleModelChange(m.id)}
+                  className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                    model === m.id
+                      ? "border-foreground/20 bg-foreground/5 text-foreground"
+                      : "border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground"
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
             </div>
           </div>
 

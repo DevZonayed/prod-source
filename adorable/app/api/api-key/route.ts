@@ -7,6 +7,7 @@ import {
 
 const COOKIE_NAME = "user-api-key";
 const COOKIE_PROVIDER = "user-api-provider";
+const COOKIE_MODEL = "user-model";
 
 /** Check if a global API key is configured in the environment */
 function hasGlobalKey(): boolean {
@@ -18,6 +19,7 @@ export async function GET() {
   const jar = await cookies();
   const userKey = jar.get(COOKIE_NAME)?.value;
   const userProvider = jar.get(COOKIE_PROVIDER)?.value ?? "openai";
+  const userModel = jar.get(COOKIE_MODEL)?.value ?? null;
 
   // Check Claude Code auth
   const claudeStatus = await getClaudeAuthStatus();
@@ -31,6 +33,7 @@ export async function GET() {
     claudeEmail: claudeStatus.email ?? null,
     claudeSubscription: claudeStatus.subscriptionType ?? null,
     provider: userProvider,
+    model: userModel,
   });
 }
 
@@ -39,7 +42,8 @@ export async function POST(req: Request) {
   const body = (await req.json()) as {
     apiKey?: string;
     provider?: "openai" | "anthropic";
-    action?: "save" | "delete";
+    model?: string;
+    action?: "save" | "delete" | "save-model";
   };
 
   const jar = await cookies();
@@ -47,6 +51,19 @@ export async function POST(req: Request) {
   if (body.action === "delete") {
     jar.delete(COOKIE_NAME);
     jar.delete(COOKIE_PROVIDER);
+    jar.delete(COOKIE_MODEL);
+    return NextResponse.json({ ok: true });
+  }
+
+  // Save just the model selection (no API key change needed)
+  if (body.action === "save-model" && body.model) {
+    jar.set(COOKIE_MODEL, body.model, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 60 * 60 * 24 * 365,
+      path: "/",
+    });
     return NextResponse.json({ ok: true });
   }
 
