@@ -14,7 +14,7 @@ export const createBackendGenTools = (
   vm: Vm,
   ctx: BuildForgeContext,
 ): ToolSet => ({
-  "backend.api_route": tool({
+  "backend_api_route": tool({
     description:
       "Generate a Next.js API route handler (route.ts). Creates typed request handling with validation.",
     inputSchema: z.object({
@@ -36,7 +36,7 @@ export const createBackendGenTools = (
     },
   }),
 
-  "backend.model": tool({
+  "backend_model": tool({
     description:
       "Generate a data model/schema file (Prisma schema, Mongoose model, or TypeScript interface).",
     inputSchema: z.object({
@@ -55,7 +55,7 @@ export const createBackendGenTools = (
     },
   }),
 
-  "backend.service": tool({
+  "backend_service": tool({
     description:
       "Generate a service/business logic module. Contains CRUD operations, validations, and domain logic.",
     inputSchema: z.object({
@@ -69,7 +69,7 @@ export const createBackendGenTools = (
     },
   }),
 
-  "backend.auth": tool({
+  "backend_auth": tool({
     description:
       "Generate authentication-related code (auth config, middleware, helpers).",
     inputSchema: z.object({
@@ -86,7 +86,7 @@ export const createBackendGenTools = (
     },
   }),
 
-  "backend.middleware": tool({
+  "backend_middleware": tool({
     description:
       "Generate middleware (Next.js middleware, API middleware, validation, etc.).",
     inputSchema: z.object({
@@ -100,7 +100,7 @@ export const createBackendGenTools = (
     },
   }),
 
-  "backend.validation": tool({
+  "backend_validation": tool({
     description:
       "Generate validation schemas (Zod schemas for API request/response validation).",
     inputSchema: z.object({
@@ -114,7 +114,7 @@ export const createBackendGenTools = (
     },
   }),
 
-  "backend.database": tool({
+  "backend_database": tool({
     description:
       "Generate database configuration or migration files.",
     inputSchema: z.object({
@@ -133,7 +133,7 @@ export const createBackendGenTools = (
     },
   }),
 
-  "backend.seed": tool({
+  "backend_seed": tool({
     description:
       "Generate database seed/sample data files.",
     inputSchema: z.object({

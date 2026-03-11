@@ -25,7 +25,7 @@ export const createSpecEngineTools = (
   vm: Vm,
   ctx: BuildForgeContext,
 ): ToolSet => ({
-  "spec.parse": tool({
+  "spec_parse": tool({
     description:
       "Parse a natural language project description into a full structured specification. This is the main entry point — call this when the user describes what they want to build. It matches patterns, extracts entities/screens/APIs, and stores the spec in project memory.",
     inputSchema: z.object({
@@ -93,7 +93,7 @@ export const createSpecEngineTools = (
     },
   }),
 
-  "spec.pattern_match": tool({
+  "spec_pattern_match": tool({
     description:
       "Match a project description against known application patterns (e-commerce, SaaS, marketplace, CRM, CMS, booking, social, LMS). Returns the best match with suggested entities and screens.",
     inputSchema: z.object({
@@ -108,33 +108,33 @@ export const createSpecEngineTools = (
     },
   }),
 
-  "spec.validate": tool({
+  "spec_validate": tool({
     description:
       "Validate the current project specification for completeness and consistency. Checks for orphan entities, missing CRUD ops, undefined references, etc.",
     inputSchema: z.object({}),
     execute: async () => {
       const spec = ctx.currentSpec;
       if (!spec) {
-        return { ok: false, error: "No spec found. Run spec.parse first." };
+        return { ok: false, error: "No spec found. Run spec_parse first." };
       }
       const result = validateSpec(spec);
       return { ok: true, ...result };
     },
   }),
 
-  "spec.read": tool({
+  "spec_read": tool({
     description: "Read the current project specification.",
     inputSchema: z.object({}),
     execute: async () => {
       const spec = await import("../../memory/level2-project").then((m) => m.readSpec(vm));
       if (!spec) {
-        return { ok: false, error: "No spec found. Run spec.parse first." };
+        return { ok: false, error: "No spec found. Run spec_parse first." };
       }
       return { ok: true, spec };
     },
   }),
 
-  "spec.update_entity": tool({
+  "spec_update_entity": tool({
     description: "Add or update a single entity in the specification.",
     inputSchema: z.object({
       entity: entityExtractionSchema.shape.entities.element.describe("Entity to add/update."),
@@ -142,7 +142,7 @@ export const createSpecEngineTools = (
     execute: async ({ entity }) => {
       const spec = await import("../../memory/level2-project").then((m) => m.readSpec(vm));
       if (!spec) {
-        return { ok: false, error: "No spec found. Run spec.parse first." };
+        return { ok: false, error: "No spec found. Run spec_parse first." };
       }
 
       const idx = spec.entities.findIndex(
@@ -161,7 +161,7 @@ export const createSpecEngineTools = (
     },
   }),
 
-  "spec.add_screen": tool({
+  "spec_add_screen": tool({
     description: "Add a new screen to the specification.",
     inputSchema: z.object({
       screen: screenExtractionSchema.shape.screens.element.describe("Screen to add."),
@@ -169,7 +169,7 @@ export const createSpecEngineTools = (
     execute: async ({ screen }) => {
       const spec = await import("../../memory/level2-project").then((m) => m.readSpec(vm));
       if (!spec) {
-        return { ok: false, error: "No spec found. Run spec.parse first." };
+        return { ok: false, error: "No spec found. Run spec_parse first." };
       }
 
       spec.screens.push(screen as Screen);

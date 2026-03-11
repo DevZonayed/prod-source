@@ -13,7 +13,7 @@ export const createTestingQaTools = (
   vm: Vm,
   ctx: BuildForgeContext,
 ): ToolSet => ({
-  "test.unit": tool({
+  "test_unit": tool({
     description:
       "Generate and optionally run a unit test file for a component or utility.",
     inputSchema: z.object({
@@ -36,7 +36,7 @@ export const createTestingQaTools = (
     },
   }),
 
-  "quality.type_check": tool({
+  "quality_type_check": tool({
     description:
       "Run TypeScript type checking (tsc --noEmit) on the project.",
     inputSchema: z.object({}),
@@ -54,7 +54,7 @@ export const createTestingQaTools = (
     },
   }),
 
-  "quality.lint": tool({
+  "quality_lint": tool({
     description:
       "Run ESLint/Next lint on the project.",
     inputSchema: z.object({
@@ -69,7 +69,7 @@ export const createTestingQaTools = (
     },
   }),
 
-  "quality.build_check": tool({
+  "quality_build_check": tool({
     description:
       "Run a production build (next build) to catch build-time errors.",
     inputSchema: z.object({}),
@@ -86,7 +86,7 @@ export const createTestingQaTools = (
     },
   }),
 
-  "quality.code_review": tool({
+  "quality_code_review": tool({
     description:
       "Review a file for common issues: unused imports, console.logs, hardcoded values, missing error handling.",
     inputSchema: z.object({

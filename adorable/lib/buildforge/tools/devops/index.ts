@@ -13,7 +13,7 @@ export const createDevopsTools = (
   vm: Vm,
   ctx: BuildForgeContext,
 ): ToolSet => ({
-  "devops.health_check": tool({
+  "devops_health_check": tool({
     description:
       "Check the health of the running application (dev server status, response time).",
     inputSchema: z.object({
@@ -40,7 +40,7 @@ export const createDevopsTools = (
     },
   }),
 
-  "devops.bundle_analyze": tool({
+  "devops_bundle_analyze": tool({
     description:
       "Analyze the production bundle size to identify large dependencies.",
     inputSchema: z.object({}),
@@ -53,7 +53,7 @@ export const createDevopsTools = (
     },
   }),
 
-  "devops.generate_dockerfile": tool({
+  "devops_generate_dockerfile": tool({
     description:
       "Generate a Dockerfile for the application.",
     inputSchema: z.object({
@@ -66,7 +66,7 @@ export const createDevopsTools = (
     },
   }),
 
-  "devops.generate_ci": tool({
+  "devops_generate_ci": tool({
     description:
       "Generate a CI/CD pipeline configuration (GitHub Actions).",
     inputSchema: z.object({

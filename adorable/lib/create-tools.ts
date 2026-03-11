@@ -122,7 +122,7 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
 
   const writeFileTool = tool({
     description:
-      "Write content to a file in the Adorable VM. Input is the file path relative to the workdir and the content to write.",
+      "Write content to a file in the Adorable VM. Input is the file path relative to the workdir and the content to write. For writing multiple files, prefer batchWriteFilesTool instead.",
     inputSchema: z
       .object({
         file: z.string().min(1).describe("The path of the file to write."),
@@ -132,6 +132,15 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
     execute: async ({ file, content }) => {
       const safeFile = file ? normalizeRelativePath(file) : null;
       if (!safeFile) return { ok: false, error: "File path is required." };
+      // Deduplication: skip write if file already has identical content
+      try {
+        const existing = await vm.fs.readTextFile(safeFile);
+        if (typeof existing === "string" && existing === content) {
+          return { ok: true, skipped: true };
+        }
+      } catch {
+        // File doesn't exist yet, proceed with write
+      }
       await vm.fs.writeTextFile(safeFile, content);
       return { ok: true };
     },
@@ -319,6 +328,44 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
     },
   });
 
+  const batchWriteFilesTool = tool({
+    description:
+      "Write multiple files at once in parallel. Use this instead of calling writeFileTool repeatedly. Much faster for creating multiple components, pages, or config files at the same time.",
+    inputSchema: z.object({
+      files: z.array(z.object({
+        file: z.string().min(1).describe("The path of the file to write."),
+        content: z.string().describe("The content to write to the file."),
+      })).min(1).max(20).describe("Array of files to write. Each has a file path and content."),
+    }),
+    execute: async ({ files }) => {
+      const results = await Promise.all(
+        files.map(async ({ file, content }) => {
+          const safeFile = file ? normalizeRelativePath(file) : null;
+          if (!safeFile) return { file, ok: false, error: "Invalid file path." };
+          try {
+            // Deduplication: skip if content is identical
+            try {
+              const existing = await vm.fs.readTextFile(safeFile);
+              if (typeof existing === "string" && existing === content) {
+                return { file: safeFile, ok: true, skipped: true };
+              }
+            } catch {
+              // File doesn't exist, proceed
+            }
+            await vm.fs.writeTextFile(safeFile, content);
+            return { file: safeFile, ok: true, skipped: false };
+          } catch (e) {
+            return { file: safeFile, ok: false, error: e instanceof Error ? e.message : "Write failed" };
+          }
+        }),
+      );
+      const written = results.filter((r) => r.ok && !r.skipped).length;
+      const skipped = results.filter((r) => r.ok && r.skipped).length;
+      const failed = results.filter((r) => !r.ok).length;
+      return { ok: failed === 0, results, summary: { written, skipped, failed, total: files.length } };
+    },
+  });
+
   const commitTool = tool({
     description:
       "Stage all current changes, commit them, and push them to the remote repository. You should use this at any point you think the user would have value returning to. Always commit and push your changes when you finish a task.",
@@ -480,6 +527,7 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
     bashTool,
     readFileTool,
     writeFileTool,
+    batchWriteFilesTool,
     listFilesTool,
     searchFilesTool,
     replaceInFileTool,
