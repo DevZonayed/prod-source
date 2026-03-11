@@ -31,21 +31,58 @@ export async function getClaudeAccessToken(): Promise<string | null> {
     const raw = await readFile(CREDENTIALS_PATH, "utf-8");
     const creds: ClaudeCredentials = JSON.parse(raw);
     const oauth = creds.claudeAiOauth;
-    if (!oauth?.accessToken) return null;
 
-    // Check expiry (with 5 min buffer)
-    if (oauth.expiresAt && Date.now() > oauth.expiresAt - 5 * 60 * 1000) {
-      // Token expired or about to expire — try refreshing
+    if (!oauth?.accessToken) {
+      console.warn("[ClaudeAuth] No accessToken found in credentials file");
+      return null;
+    }
+
+    const now = Date.now();
+    const timeUntilExpiry = oauth.expiresAt ? oauth.expiresAt - now : Infinity;
+    const isExpired = oauth.expiresAt && now > oauth.expiresAt - 5 * 60 * 1000;
+
+    console.log("[ClaudeAuth] Token state:", {
+      hasToken: !!oauth.accessToken,
+      tokenPrefix: oauth.accessToken?.slice(0, 20) + "...",
+      expiresAt: oauth.expiresAt
+        ? new Date(oauth.expiresAt).toISOString()
+        : "none",
+      timeUntilExpiryMs: timeUntilExpiry,
+      isExpiredOrExpiring: isExpired,
+    });
+
+    if (isExpired) {
+      console.log("[ClaudeAuth] Token expired or expiring soon, refreshing...");
       const refreshed = await refreshClaudeAuth();
-      if (!refreshed) return null;
+      if (!refreshed) {
+        console.error("[ClaudeAuth] Token refresh failed");
+        return null;
+      }
       // Re-read after refresh
       const freshRaw = await readFile(CREDENTIALS_PATH, "utf-8");
       const freshCreds: ClaudeCredentials = JSON.parse(freshRaw);
-      return freshCreds.claudeAiOauth?.accessToken ?? null;
+      const freshToken = freshCreds.claudeAiOauth?.accessToken ?? null;
+
+      if (freshToken) {
+        const freshExpiry = freshCreds.claudeAiOauth?.expiresAt;
+        console.log("[ClaudeAuth] Token refreshed:", {
+          tokenPrefix: freshToken.slice(0, 20) + "...",
+          newExpiresAt: freshExpiry
+            ? new Date(freshExpiry).toISOString()
+            : "none",
+          tokenChanged: freshToken !== oauth.accessToken,
+        });
+      } else {
+        console.error(
+          "[ClaudeAuth] No token in credentials after refresh",
+        );
+      }
+      return freshToken;
     }
 
     return oauth.accessToken;
-  } catch {
+  } catch (err) {
+    console.error("[ClaudeAuth] Failed to read credentials:", err);
     return null;
   }
 }
@@ -102,17 +139,33 @@ export async function startClaudeAuthLogin(): Promise<{
 }
 
 /**
- * Refresh Claude Code auth by running a quick status check.
- * Claude CLI auto-refreshes tokens when used.
+ * Refresh Claude Code auth by invoking the CLI which auto-refreshes tokens.
+ * Tries multiple approaches: `auth status` first, then a lightweight `--version`
+ * call (which also triggers credential refresh in some CLI versions).
  */
 async function refreshClaudeAuth(): Promise<boolean> {
+  // Approach 1: `auth status` — triggers refresh in most CLI versions
   try {
     const output = await execClaudeCli(["auth", "status"]);
+    console.log("[ClaudeAuth] Refresh via `auth status` output:", output);
     const status = JSON.parse(output);
-    return status.loggedIn === true;
-  } catch {
-    return false;
+    if (status.loggedIn === true) return true;
+  } catch (err) {
+    console.warn("[ClaudeAuth] `auth status` refresh failed:", err);
   }
+
+  // Approach 2: `print-auth-token` — some CLI versions expose this
+  try {
+    const token = await execClaudeCli(["print-auth-token"], 15_000);
+    if (token && token.startsWith("sk-ant-")) {
+      console.log("[ClaudeAuth] Got fresh token via `print-auth-token`");
+      return true;
+    }
+  } catch {
+    // Not available in all CLI versions, that's fine
+  }
+
+  return false;
 }
 
 /**

@@ -71,6 +71,7 @@ export async function POST(req: Request) {
   const jar = await cookies();
   const userApiKey = jar.get("user-api-key")?.value;
   const userProvider = jar.get("user-api-provider")?.value;
+  const userModel = jar.get("user-model")?.value;
 
   const hasGlobalKey = !!(
     process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY
@@ -92,26 +93,32 @@ export async function POST(req: Request) {
     );
   }
 
-  let llmOptions: { apiKey?: string; providerOverride?: string } = {};
+  let llmOptions: { apiKey?: string; providerOverride?: string; modelOverride?: string } = {};
 
   if (envForcesClaudeCode && hasClaudeCode) {
-    llmOptions = { providerOverride: "claude-code" };
+    llmOptions = { apiKey: claudeToken!, providerOverride: "claude-code", modelOverride: userModel };
   } else if (hasGlobalKey) {
-    llmOptions = {};
+    llmOptions = { modelOverride: userModel };
   } else if (userApiKey) {
-    llmOptions = { apiKey: userApiKey, providerOverride: userProvider };
+    llmOptions = { apiKey: userApiKey, providerOverride: userProvider, modelOverride: userModel };
   } else if (hasClaudeCode) {
-    llmOptions = { providerOverride: "claude-code" };
+    llmOptions = { apiKey: claudeToken!, providerOverride: "claude-code", modelOverride: userModel };
   }
 
-  console.log("[LLM Auth]", {
+  console.log("[LLM Auth]", JSON.stringify({
     agentMode: AGENT_MODE,
     envProvider,
     hasGlobalKey,
     hasUserCookie: !!userApiKey,
+    userProvider: userProvider ?? null,
     hasClaudeCode,
+    claudeTokenPrefix: claudeToken ? claudeToken.slice(0, 20) + "..." : null,
     chosenPath: llmOptions.providerOverride ?? (hasGlobalKey ? "global-env" : "unknown"),
-  });
+    llmOptions: {
+      ...llmOptions,
+      apiKey: llmOptions.apiKey ? llmOptions.apiKey.slice(0, 15) + "..." : undefined,
+    },
+  }, null, 2));
 
   // ─── Extract latest user message ───
   const latestUserMessage = messages
