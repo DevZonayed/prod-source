@@ -27,6 +27,7 @@ import {
   groupConsecutiveToolCalls,
   ToolCallGroup,
 } from "@/components/assistant-ui/tool-group";
+import { MessageMetrics } from "@/components/assistant-ui/message-metrics";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -224,9 +225,10 @@ const AssistantMessage: FC = () => {
         <MessageError />
       </div>
 
-      <div className="aui-assistant-message-footer mt-1 ml-2 flex">
+      <div className="aui-assistant-message-footer mt-1 ml-2 flex items-center gap-2">
         <BranchPicker />
         <AssistantActionBar />
+        <MessageMetrics />
       </div>
     </MessagePrimitive.Root>
   );

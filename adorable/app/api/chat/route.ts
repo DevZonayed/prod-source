@@ -174,6 +174,14 @@ export async function POST(req: Request) {
       sendReasoning: true,
       originalMessages: messages,
       generateMessageId: () => crypto.randomUUID(),
+      messageMetadata: ({ part }) => {
+        if (part.type === "finish") {
+          return {
+            steps: [{ usage: { inputTokens: part.totalUsage.inputTokens ?? 0, outputTokens: part.totalUsage.outputTokens ?? 0 } }],
+          };
+        }
+        return undefined;
+      },
       onFinish: async ({ messages: finalMessages }) => {
         const latestMetadata = await readRepoMetadata(repoId);
         if (!latestMetadata) return;
@@ -235,6 +243,14 @@ export async function POST(req: Request) {
     sendReasoning: true,
     originalMessages: messages,
     generateMessageId: () => crypto.randomUUID(),
+    messageMetadata: ({ part }) => {
+      if (part.type === "finish") {
+        return {
+          steps: [{ usage: { inputTokens: part.totalUsage.inputTokens ?? 0, outputTokens: part.totalUsage.outputTokens ?? 0 } }],
+        };
+      }
+      return undefined;
+    },
     onFinish: async ({ messages: finalMessages }) => {
       const latestMetadata = await readRepoMetadata(repoId);
       if (!latestMetadata) return;
