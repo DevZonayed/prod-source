@@ -10,7 +10,7 @@ import {
   TerminalIcon,
   XIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
@@ -154,6 +154,19 @@ export const BashToolCard: ToolCallMessagePartComponent = ({
   const cmd = str(a.command);
   const hasOutput = str(r.stdout) || str(r.stderr);
   const running = status?.type === "running";
+
+  const bashDispatched = useRef(false);
+  useEffect(() => {
+    if (status?.type === "running" || bashDispatched.current) return;
+    if (r.ok === false && (str(r.stderr) || str(r.stdout))) {
+      bashDispatched.current = true;
+      window.dispatchEvent(
+        new CustomEvent("voxel:tool-error", {
+          detail: { toolName: "bashTool", result: r },
+        }),
+      );
+    }
+  }, [status, r]);
 
   return (
     <ToolLine
@@ -387,6 +400,19 @@ export const CheckAppToolCard: ToolCallMessagePartComponent = ({
   const isOk = r.ok === true;
   const statusCode = typeof r.statusCode === "number" ? r.statusCode : null;
 
+  const checkDispatched = useRef(false);
+  useEffect(() => {
+    if (status?.type === "running" || checkDispatched.current) return;
+    if (r.ok === false) {
+      checkDispatched.current = true;
+      window.dispatchEvent(
+        new CustomEvent("voxel:tool-error", {
+          detail: { toolName: "checkAppTool", result: r },
+        }),
+      );
+    }
+  }, [status, r]);
+
   return (
     <div className="my-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1 text-sm">
       <span className="flex w-4 shrink-0 items-center justify-center">
@@ -424,12 +450,69 @@ export const DevServerLogsToolCard: ToolCallMessagePartComponent = ({
   const maxLines =
     typeof a.maxLines === "number" ? `${a.maxLines} lines` : undefined;
 
+  const logsDispatched = useRef(false);
+  useEffect(() => {
+    if (status?.type === "running" || logsDispatched.current) return;
+    if (typeof r.logs === "string") {
+      const hasErrors =
+        /(error|failed to compile|module not found|unhandled runtime|typeerror|syntaxerror|referenceerror)/i.test(
+          r.logs as string,
+        );
+      if (hasErrors) {
+        logsDispatched.current = true;
+        window.dispatchEvent(
+          new CustomEvent("voxel:tool-error", {
+            detail: { toolName: "devServerLogsTool", result: r },
+          }),
+        );
+      }
+    }
+  }, [status, r]);
+
   return (
     <ToolLine
       label={running ? "Reading dev logs" : "Dev logs"}
       detail={maxLines ? `last ${maxLines}` : undefined}
       status={status}
       expandContent={r.logs ? <DetailBlock data={r.logs} /> : undefined}
+    />
+  );
+};
+
+export const MemoryQueryToolCard: ToolCallMessagePartComponent = ({
+  argsText,
+  result,
+  status,
+}) => {
+  const a = parse(argsText);
+  const r = obj(result);
+  const running = status?.type === "running";
+  const query = str(a.query) ?? str(a.category);
+
+  return (
+    <ToolLine
+      label={running ? "Querying memory" : "Queried memory"}
+      detail={query ? `"${query}"` : undefined}
+      status={status}
+      expandContent={r.results ? <DetailBlock data={r.results} /> : undefined}
+    />
+  );
+};
+
+export const MemorySyncToolCard: ToolCallMessagePartComponent = ({
+  argsText,
+  result,
+  status,
+}) => {
+  const a = parse(argsText);
+  const running = status?.type === "running";
+  const action = str(a.action) ?? str(a.category);
+
+  return (
+    <ToolLine
+      label={running ? "Syncing memory" : "Memory synced"}
+      detail={action}
+      status={status}
     />
   );
 };

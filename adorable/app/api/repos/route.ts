@@ -2,12 +2,11 @@ import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { freestyle } from "freestyle-sandboxes";
 import { TEMPLATE_REPO } from "@/lib/vars";
-import { createVmForRepo } from "@/lib/adorable-vm";
-import { adorableVmSpec } from "@/lib/adorable-vm";
+import { createVmForRepo, voxelVmSpec } from "@/lib/voxel-vm";
 import { getOrCreateIdentitySession } from "@/lib/identity-session";
 import { upgradeNextjs } from "@/lib/upgrade-dependencies";
 import {
-  ADORABLE_WRAPPER_REPO_PREFIX,
+  VOXEL_WRAPPER_REPO_PREFIX,
   type RepoMetadata,
   type RepoDeploymentSummary,
   createConversationInRepo,
@@ -17,8 +16,8 @@ import {
 
 const toDisplayRepoName = (name?: string | null) => {
   if (!name) return undefined;
-  return name.startsWith(ADORABLE_WRAPPER_REPO_PREFIX)
-    ? name.slice(ADORABLE_WRAPPER_REPO_PREFIX.length)
+  return name.startsWith(VOXEL_WRAPPER_REPO_PREFIX)
+    ? name.slice(VOXEL_WRAPPER_REPO_PREFIX.length)
     : name;
 };
 
@@ -89,7 +88,7 @@ export async function GET() {
   const { identityId, identity } = await getOrCreateIdentitySession();
   const { repositories } = await identity.permissions.git.list({ limit: 200 });
   const wrapperRepositories = repositories.filter((repo) =>
-    (repo.name ?? "").startsWith(ADORABLE_WRAPPER_REPO_PREFIX),
+    (repo.name ?? "").startsWith(VOXEL_WRAPPER_REPO_PREFIX),
   );
 
   let deploymentEntries: DeploymentEntry[] = [];
@@ -163,7 +162,7 @@ export async function POST(req: Request) {
 
   const inferredName =
     requestedName ?? githubRepoName?.split("/").pop()?.trim() ?? "Project";
-  const wrapperRepoName = `${ADORABLE_WRAPPER_REPO_PREFIX}${inferredName}`;
+  const wrapperRepoName = `${VOXEL_WRAPPER_REPO_PREFIX}${inferredName}`;
   const wrapperCreated = await freestyle.git.repos.create({
     name: wrapperRepoName,
   });
@@ -186,7 +185,7 @@ export async function POST(req: Request) {
   });
 
   // Upgrade Next.js to latest version in background (don't block repo creation)
-  const vmRef = freestyle.vms.ref({ vmId: vm.vmId, spec: adorableVmSpec });
+  const vmRef = freestyle.vms.ref({ vmId: vm.vmId, spec: voxelVmSpec });
   void upgradeNextjs(vmRef).catch((err) => {
     console.error("Next.js auto-upgrade failed:", err);
   });

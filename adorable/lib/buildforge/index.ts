@@ -15,7 +15,6 @@ export type {
   ExecutionPlan,
   BuildForgeContext,
   ToolCategory,
-  ToolPhase,
   MemoryFileType,
   PatternId,
   ValidationResult,
@@ -30,8 +29,6 @@ export {
   MEMORY_DIR,
   MEMORY_FILES,
   SPEC_FILE,
-  MAX_TOOLS_PER_CALL,
-  PHASE_TOOL_CATEGORIES,
 } from "./constants";
 
 // Memory System
@@ -69,7 +66,6 @@ export {
 
 // Tools
 export {
-  getToolsForPhase,
-  getAllBuildForgeTools,
+  getBuildForgeTools,
   detectPhase,
 } from "./tools";

@@ -1,5 +1,5 @@
 import { freestyle } from "freestyle-sandboxes";
-import { adorableVmSpec } from "@/lib/adorable-vm";
+import { voxelVmSpec } from "@/lib/voxel-vm";
 import { getOrCreateIdentitySession } from "@/lib/identity-session";
 import { readRepoMetadata } from "@/lib/repo-storage";
 import { WORKDIR } from "@/lib/vars";
@@ -28,7 +28,7 @@ export async function GET(
 
   const vm = freestyle.vms.ref({
     vmId: metadata.vm.vmId,
-    spec: adorableVmSpec,
+    spec: voxelVmSpec,
   });
 
   try {

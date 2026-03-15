@@ -3,7 +3,7 @@
 // Token budgets, retry limits, file paths, and configuration defaults.
 // =============================================================================
 
-import type { ContextLayerId, TaskType, ToolCategory, ToolPhase } from "./types";
+import type { ContextLayerId } from "./types";
 
 // -----------------------------------------------------------------------------
 // Token Budgets (per context layer)
@@ -54,57 +54,6 @@ export const MAX_RETRIES = 3;
 export const MAX_TASKS_PER_PLAN = 50;
 export const MAX_STEPS_PER_EXECUTION = 100;
 export const CHECKPOINT_INTERVAL = 5; // Create checkpoint every N tasks
-
-// -----------------------------------------------------------------------------
-// Tool Phase Mapping
-// Determines which tool categories are exposed in each phase.
-// -----------------------------------------------------------------------------
-
-export const PHASE_TOOL_CATEGORIES: Record<ToolPhase, ToolCategory[]> = {
-  initialization: ["base", "project-init", "spec-engine", "memory-context"],
-  specification: ["base", "spec-engine", "memory-context", "thinker"],
-  generation: [
-    "base",
-    "memory-context",
-    "frontend-gen",
-    "backend-gen",
-    "design-system",
-    "thinker",
-  ],
-  validation: ["base", "testing-qa", "repo-analysis", "memory-context"],
-  deployment: ["base", "devops", "memory-context"],
-  analysis: ["base", "repo-analysis", "memory-context", "thinker"],
-};
-
-// Maximum tools per LLM call to prevent context bloat
-export const MAX_TOOLS_PER_CALL = 40;
-
-// -----------------------------------------------------------------------------
-// Task Type to Context Budget Mapping
-// -----------------------------------------------------------------------------
-
-export const TASK_CONTEXT_BUDGET: Record<TaskType, string> = {
-  spec_parse: "full_feature",
-  frontend_page: "complex_page",
-  frontend_component: "simple_component",
-  frontend_form: "complex_page",
-  frontend_layout: "simple_component",
-  frontend_store: "simple_component",
-  frontend_hook: "simple_component",
-  backend_module: "backend_module",
-  backend_api: "backend_module",
-  backend_service: "backend_module",
-  backend_auth: "full_feature",
-  backend_model: "simple_component",
-  design_system: "architecture_decision",
-  design_component: "simple_component",
-  test_unit: "simple_component",
-  test_e2e: "complex_page",
-  devops_docker: "backend_module",
-  devops_ci: "backend_module",
-  repo_analysis: "full_feature",
-  general: "default",
-};
 
 // -----------------------------------------------------------------------------
 // Pattern Keywords (for quick matching)

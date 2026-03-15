@@ -321,26 +321,7 @@ export type Checkpoint = {
 // Tool System Types
 // -----------------------------------------------------------------------------
 
-export type ToolCategory =
-  | "project-init"
-  | "spec-engine"
-  | "memory-context"
-  | "frontend-gen"
-  | "backend-gen"
-  | "design-system"
-  | "testing-qa"
-  | "devops"
-  | "repo-analysis"
-  | "thinker"
-  | "base";
-
-export type ToolPhase =
-  | "initialization"
-  | "specification"
-  | "generation"
-  | "validation"
-  | "deployment"
-  | "analysis";
+export type ToolCategory = "base" | "memory";
 
 export type BuildForgeContext = {
   vm: Vm;

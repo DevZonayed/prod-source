@@ -1,0 +1,6 @@
+[    5783ms] [WARNING] Image with src "/placeholder-freestyle-logo.svg" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading @ https://6aa59315-8099-4d93-9695-5109915ccd96-voxel.style.dev/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297
+[   26841ms] [WARNING] Image with src "/placeholder-freestyle-logo.svg" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading @ https://885468e4-0d92-4a43-b01f-7f19d7ca80e7-voxel.style.dev/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297
+[   88314ms] [ERROR] WebSocket connection to 'wss://885468e4-0d92-4a43-b01f-7f19d7ca80e7-voxel.style.dev/_next/webpack-hmr?id=DOtYD4OxsFJrlcrdU5rYu' failed:  @ https://885468e4-0d92-4a43-b01f-7f19d7ca80e7-voxel.style.dev/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
+[   88314ms] [ERROR] WebSocket connection to 'ws://localhost:3002/_next/webpack-hmr?id=dZIQSROxWXgIQ8VTPyN2Z' failed:  @ http://localhost:3002/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878

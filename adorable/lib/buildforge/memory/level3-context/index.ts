@@ -10,7 +10,30 @@ import type {
   AppSpec,
   TaskType,
 } from "../../types";
-import { CONTEXT_BUDGET_BY_TASK, TASK_CONTEXT_BUDGET } from "../../constants";
+import { CONTEXT_BUDGET_BY_TASK } from "../../constants";
+
+const TASK_CONTEXT_BUDGET: Record<TaskType, string> = {
+  spec_parse: "full_feature",
+  frontend_page: "complex_page",
+  frontend_component: "simple_component",
+  frontend_form: "complex_page",
+  frontend_layout: "simple_component",
+  frontend_store: "simple_component",
+  frontend_hook: "simple_component",
+  backend_module: "backend_module",
+  backend_api: "backend_module",
+  backend_service: "backend_module",
+  backend_auth: "full_feature",
+  backend_model: "simple_component",
+  design_system: "architecture_decision",
+  design_component: "simple_component",
+  test_unit: "simple_component",
+  test_e2e: "complex_page",
+  devops_docker: "backend_module",
+  devops_ci: "backend_module",
+  repo_analysis: "full_feature",
+  general: "default",
+};
 import { buildLayer0, buildLayer1, buildLayer2, buildLayer3 } from "./layers";
 import { estimateTokens, truncateToTokenBudget } from "./tokenizer";
 

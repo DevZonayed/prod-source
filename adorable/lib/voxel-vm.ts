@@ -18,10 +18,10 @@ export type VmRuntimeMetadata = {
 };
 
 const devCommandPty = new VmPtySession({
-  sessionId: "adorable-dev-command",
+  sessionId: "voxel-dev-command",
 });
 
-export const adorableVmSpec = new VmSpec({
+export const voxelVmSpec = new VmSpec({
   with: {
     devCommandPty,
     devServer: new VmDevServer({
@@ -46,12 +46,12 @@ export const adorableVmSpec = new VmSpec({
 export const createVmForRepo = async (
   repoId: string,
 ): Promise<VmRuntimeMetadata> => {
-  const domain = `${crypto.randomUUID()}-adorable.style.dev`;
+  const domain = `${crypto.randomUUID()}-voxel.style.dev`;
   const devCommandTerminalDomain = `dev-command-${domain}`;
   const additionalTerminalsDomain = `terminals-${domain}`;
 
   const { vmId } = await freestyle.vms.create({
-    snapshot: adorableVmSpec,
+    snapshot: voxelVmSpec,
     recreate: true,
     workdir: WORKDIR,
     persistence: {
@@ -66,8 +66,8 @@ export const createVmForRepo = async (
       ],
       config: {
         user: {
-          name: "Adorable",
-          email: "adorable@freestyle.sh",
+          name: "Voxel",
+          email: "voxel@freestyle.sh",
         },
       },
     },

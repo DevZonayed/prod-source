@@ -55,13 +55,13 @@ export function WorkspaceFrame({ children }: { children: React.ReactNode }) {
     };
 
     window.addEventListener(
-      "adorable:active-conversation",
+      "voxel:active-conversation",
       handleActiveConversation as EventListener,
     );
 
     return () => {
       window.removeEventListener(
-        "adorable:active-conversation",
+        "voxel:active-conversation",
         handleActiveConversation as EventListener,
       );
     };
@@ -73,9 +73,9 @@ export function WorkspaceFrame({ children }: { children: React.ReactNode }) {
       setActiveConversationId(null);
     };
 
-    window.addEventListener("adorable:go-home", handleGoHome);
+    window.addEventListener("voxel:go-home", handleGoHome);
     return () => {
-      window.removeEventListener("adorable:go-home", handleGoHome);
+      window.removeEventListener("voxel:go-home", handleGoHome);
     };
   }, []);
 
@@ -89,12 +89,12 @@ export function WorkspaceFrame({ children }: { children: React.ReactNode }) {
     };
 
     window.addEventListener(
-      "adorable:go-to-repo",
+      "voxel:go-to-repo",
       handleGoToRepo as EventListener,
     );
     return () => {
       window.removeEventListener(
-        "adorable:go-to-repo",
+        "voxel:go-to-repo",
         handleGoToRepo as EventListener,
       );
     };

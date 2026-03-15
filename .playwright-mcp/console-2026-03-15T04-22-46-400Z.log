@@ -1,0 +1,26 @@
+[   13015ms] [WARNING] Image with src "/placeholder-freestyle-logo.svg" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading @ https://a90068b0-8025-4913-8d34-00c8d9bca0b8-voxel.style.dev/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297
+[   54663ms] [WARNING] Image with src "/placeholder-freestyle-logo.svg" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading @ https://da9394a7-ef61-4c17-92cf-12bac3babb96-voxel.style.dev/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297
+[  107578ms] [ERROR] WebSocket connection to 'ws://localhost:3008/_next/webpack-hmr?id=xzytcvrlXejjnKbDU8mel' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3008/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
+[  108579ms] [ERROR] WebSocket connection to 'ws://localhost:3008/_next/webpack-hmr?id=xzytcvrlXejjnKbDU8mel' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3008/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
+[  109580ms] [ERROR] WebSocket connection to 'ws://localhost:3008/_next/webpack-hmr?id=xzytcvrlXejjnKbDU8mel' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3008/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
+[  110581ms] [ERROR] WebSocket connection to 'ws://localhost:3008/_next/webpack-hmr?id=xzytcvrlXejjnKbDU8mel' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3008/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
+[  111582ms] [ERROR] WebSocket connection to 'ws://localhost:3008/_next/webpack-hmr?id=xzytcvrlXejjnKbDU8mel' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3008/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
+[  116617ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3008/api/chat:0
+[  116652ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3008/api/repos:0
+[  116686ms] TypeError: Failed to fetch
+    at RepoWorkspaceShell.useCallback[loadRepos] (http://localhost:3008/_next/static/chunks/adorable_2ca8e90a._.js:1511:36)
+    at RepoWorkspaceShell.useEffect.handleReposUpdated (http://localhost:3008/_next/static/chunks/adorable_2ca8e90a._.js:1573:26)
+    at Assistant.useCallback[dispatchReposUpdated] (http://localhost:3008/_next/static/chunks/adorable_64f38f12._.js:3902:20)
+    at Assistant.useCallback[handleChatFinish] [as onFinish] (http://localhost:3008/_next/static/chunks/adorable_64f38f12._.js:3911:13)
+    at Chat.onFinish (http://localhost:3008/_next/static/chunks/node_modules_%40ai-sdk_03b12f91._.js:2340:86)
+    at Chat.makeRequest (http://localhost:3008/_next/static/chunks/node_modules_ai_dist_index_mjs_a7281a1b._.js:12592:60)
+    at async AbstractChat.sendMessage (http://localhost:3008/_next/static/chunks/node_modules_ai_dist_index_mjs_a7281a1b._.js:12317:13)
+    at async useAISDKRuntime.useExternalStoreRuntime[runtime] [as onNew] (http://localhost:3008/_next/static/chunks/node_modules_%40assistant-ui_9c90d593._.js:2938:17)
+    at async ExternalStoreThreadRuntimeCore.append (http://localhost:3008/_next/static/chunks/node_modules_%40assistant-ui_core_dist_78b93b77._.js:2752:13)
+[  116688ms] [ERROR] WebSocket connection to 'ws://localhost:3008/_next/webpack-hmr?id=xzytcvrlXejjnKbDU8mel' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3008/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
+[  116693ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3008/__nextjs_original-stack-frames:0
+[  116706ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3008/__nextjs_font/geist-latin.woff2:0
+[  121693ms] [ERROR] WebSocket connection to 'ws://localhost:3008/_next/webpack-hmr?id=xzytcvrlXejjnKbDU8mel' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3008/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
+[  126694ms] [ERROR] WebSocket connection to 'ws://localhost:3008/_next/webpack-hmr?id=xzytcvrlXejjnKbDU8mel' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3008/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878

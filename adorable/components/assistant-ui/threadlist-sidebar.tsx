@@ -6,7 +6,7 @@ import { ThreadListPrimitive } from "@assistant-ui/react";
 import { ListTreeIcon, PlusIcon, RocketIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-type AdorableMetadata = {
+type VoxelMetadata = {
   repoId?: string;
 };
 
@@ -20,7 +20,7 @@ type DeploymentTimelineEntry = {
   state: "idle" | "deploying" | "live" | "failed";
 };
 
-const AdorableLogo = () => (
+const VoxelLogo = () => (
   <svg
     viewBox="0 0 347 280"
     fill="none"
@@ -53,10 +53,10 @@ export function ThreadListSidebar({
 }: React.ComponentProps<typeof Sidebar>) {
   const [tab, setTab] = React.useState<"threads" | "deployments">("threads");
   const { open, setOpen } = useSidebar();
-  const metadata = useAuiState<AdorableMetadata | undefined>(({ thread }) => {
+  const metadata = useAuiState<VoxelMetadata | undefined>(({ thread }) => {
     for (let i = thread.messages.length - 1; i >= 0; i -= 1) {
-      const m = thread.messages[i]?.metadata?.custom?.adorable as
-        | AdorableMetadata
+      const m = thread.messages[i]?.metadata?.custom?.voxel as
+        | VoxelMetadata
         | undefined;
       if (m) return m;
     }
@@ -114,8 +114,8 @@ export function ThreadListSidebar({
                   className="flex h-9 w-full items-center justify-between gap-2 rounded-lg px-2.5 text-muted-foreground hover:text-foreground"
                 >
                   <span className="flex items-center gap-2">
-                    <AdorableLogo />
-                    <span className="text-[13px] font-medium">Adorable</span>
+                    <VoxelLogo />
+                    <span className="text-[13px] font-medium">Voxel</span>
                   </span>
                   <PlusIcon className="size-3.5" />
                 </Button>

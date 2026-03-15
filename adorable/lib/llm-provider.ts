@@ -10,7 +10,7 @@ import {
   type ToolSet,
   convertToModelMessages,
 } from "ai";
-import { getClaudeAccessToken } from "@/lib/claude-auth";
+import { createClaudeCodeFetch } from "@/lib/claude-fetch";
 
 type LlmProviderName = "openai" | "anthropic" | "claude-code";
 
@@ -54,6 +54,24 @@ const resolveModel = (
   return provider === "openai" ? DEFAULT_OPENAI_MODEL : DEFAULT_ANTHROPIC_MODEL;
 };
 
+/**
+ * Create an Anthropic provider instance.
+ * For claude-code: uses a custom fetch that injects a fresh OAuth token per request.
+ * For direct anthropic: uses the provided static API key.
+ */
+const createAnthropicProvider = (provider: LlmProviderName, apiKey?: string) => {
+  if (provider === "claude-code") {
+    // Custom fetch reads fresh OAuth token from ~/.claude/.credentials.json
+    // on every HTTP call, auto-refreshes if expired, and adds oauth-2025-04-20 beta.
+    return createAnthropic({
+      apiKey: "placeholder-replaced-by-fetch", // custom fetch overrides x-api-key
+      fetch: createClaudeCodeFetch(),
+    });
+  }
+
+  return apiKey ? createAnthropic({ apiKey }) : createAnthropic({});
+};
+
 type StreamLlmResponseParams = {
   system: string;
   messages: UIMessage[];
@@ -83,8 +101,7 @@ export const getModelForProvider = async (
   console.log("[LLM Provider] getModelForProvider:", JSON.stringify({
     provider,
     modelId,
-    hasApiKeyArg: !!apiKey,
-    apiKeyArgPrefix: apiKey ? apiKey.slice(0, 15) + "..." : null,
+    tokenSource: provider === "claude-code" ? "per-request-fetch" : (apiKey ? "passed-in" : "env"),
   }));
 
   if (provider === "openai") {
@@ -94,31 +111,7 @@ export const getModelForProvider = async (
     return openaiProvider.responses(modelId);
   }
 
-  // When apiKey is passed (e.g. from route.ts with a pre-fetched token), use it directly.
-  // Only re-read from disk as a fallback when no apiKey was provided.
-  let effectiveKey = apiKey;
-  if (!effectiveKey && provider === "claude-code") {
-    const token = await getClaudeAccessToken();
-    if (!token) {
-      throw new Error(
-        "Claude Code is not authenticated. Please run 'claude auth login' or sign in from the app.",
-      );
-    }
-    effectiveKey = token;
-  }
-
-  console.log("[LLM Provider] Anthropic config:", JSON.stringify({
-    provider,
-    modelId,
-    hasEffectiveKey: !!effectiveKey,
-    keyPrefix: effectiveKey ? effectiveKey.slice(0, 20) + "..." : null,
-    keyLength: effectiveKey?.length ?? 0,
-    keySource: apiKey ? "passed-in" : "re-fetched",
-  }));
-
-  const anthropicProvider = effectiveKey
-    ? createAnthropic({ apiKey: effectiveKey })
-    : createAnthropic({});
+  const anthropicProvider = createAnthropicProvider(provider, apiKey);
   return anthropicProvider(modelId);
 };
 
@@ -146,7 +139,7 @@ export const streamLlmResponse = async ({
           reasoningEffort: "low",
         } satisfies OpenAIResponsesProviderOptions,
       },
-      stopWhen: stepCountIs(100),
+      stopWhen: stepCountIs(200),
     });
 
     return {
@@ -155,37 +148,19 @@ export const streamLlmResponse = async ({
     };
   }
 
-  // Claude Code OAuth tokens (sk-ant-oat01-*) work as x-api-key on Anthropic's API.
-  // Use passed-in apiKey directly; only re-read from disk as fallback.
-  let effectiveKey = apiKey;
-
-  if (!effectiveKey && provider === "claude-code") {
-    const token = await getClaudeAccessToken();
-    if (!token) {
-      throw new Error(
-        "Claude Code is not authenticated. Please run 'claude auth login' or sign in from the app.",
-      );
-    }
-    effectiveKey = token;
-  }
-
   console.log("[LLM Provider] streamLlmResponse Anthropic config:", JSON.stringify({
     provider,
     modelId,
-    hasEffectiveKey: !!effectiveKey,
-    keyPrefix: effectiveKey ? effectiveKey.slice(0, 20) + "..." : null,
-    keyLength: effectiveKey?.length ?? 0,
+    tokenSource: provider === "claude-code" ? "per-request-fetch" : (apiKey ? "passed-in" : "env"),
   }));
 
-  const anthropicProvider = effectiveKey
-    ? createAnthropic({ apiKey: effectiveKey })
-    : createAnthropic({});
+  const anthropicProvider = createAnthropicProvider(provider, apiKey);
   const result = streamText({
     system,
     model: anthropicProvider(modelId),
     messages: modelMessages,
     tools,
-    stopWhen: stepCountIs(100),
+    stopWhen: stepCountIs(200),
   });
 
   return {

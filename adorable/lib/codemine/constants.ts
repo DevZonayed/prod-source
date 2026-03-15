@@ -2,9 +2,12 @@ import type { AgenticLoopConfig } from "./types";
 
 // ─── Agentic Loop Defaults ───
 
+// Matches official Claude Code CLI (cli.js v2.1.76):
+//   Main session maxTurns: 200
+//   Subagent maxTurns: 20 (IxY=20)
 export const DEFAULT_LOOP_CONFIG: AgenticLoopConfig = {
-  softLimit: 50,
-  hardLimit: 100,
+  softLimit: 150,
+  hardLimit: 200,
   perToolTimeout: 30_000,
   totalTaskTimeout: 30 * 60_000,
   idleTimeout: 5 * 60_000,

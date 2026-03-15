@@ -67,7 +67,7 @@ const formatRelativeTime = (dateString: string) => {
   return `${diffDays}d ago`;
 };
 
-const AdorableLogo = () => (
+const VoxelLogo = () => (
   <svg
     viewBox="0 0 347 280"
     fill="none"
@@ -179,9 +179,9 @@ export function RepoSidebar({
             {/* Brand header */}
             <div className="flex h-12 shrink-0 items-center justify-between px-3">
               <div className="flex items-center gap-2">
-                <AdorableLogo />
+                <VoxelLogo />
                 <span className="text-sm font-semibold tracking-tight text-foreground">
-                  Adorable
+                  Voxel
                 </span>
               </div>
               <button
