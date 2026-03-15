@@ -45,7 +45,7 @@ export const HomeWelcome: FC = () => {
 
     setGithubRepoError(null);
     window.dispatchEvent(
-      new CustomEvent("adorable:create-from-github", {
+      new CustomEvent("voxel:create-from-github", {
         detail: { githubRepoName },
       }),
     );

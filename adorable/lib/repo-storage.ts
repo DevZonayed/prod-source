@@ -1,9 +1,9 @@
 import { type UIMessage } from "ai";
 import { freestyle } from "freestyle-sandboxes";
 
-export const ADORABLE_METADATA_PATH = "metadata.json";
-export const ADORABLE_CONVERSATIONS_DIR = "conversations";
-export const ADORABLE_WRAPPER_REPO_PREFIX = "adorable-meta - ";
+export const VOXEL_METADATA_PATH = "metadata.json";
+export const VOXEL_CONVERSATIONS_DIR = "conversations";
+export const VOXEL_WRAPPER_REPO_PREFIX = "voxel-meta - ";
 
 export type RepoVmMetadata = {
   vmId: string;
@@ -94,14 +94,14 @@ const writeCommit = async (
     branch,
     files,
     author: {
-      name: "Adorable",
-      email: "adorable@freestyle.sh",
+      name: "Voxel",
+      email: "voxel@freestyle.sh",
     },
   });
 };
 
 const conversationPath = (conversationId: string) => {
-  return `${ADORABLE_CONVERSATIONS_DIR}/${conversationId}.json`;
+  return `${VOXEL_CONVERSATIONS_DIR}/${conversationId}.json`;
 };
 
 const deriveConversationTitle = (
@@ -125,7 +125,7 @@ export const readRepoMetadata = async (
 ): Promise<RepoMetadata | null> => {
   const metadata = await readJsonFile<StoredRepoMetadata>(
     repoId,
-    ADORABLE_METADATA_PATH,
+    VOXEL_METADATA_PATH,
   );
   if (!metadata) return null;
   if (!metadata.sourceRepoId) return null;
@@ -151,8 +151,8 @@ export const writeRepoMetadata = async (
   repoId: string,
   metadata: RepoMetadata,
 ) => {
-  await writeCommit(repoId, "Update adorable metadata", [
-    { path: ADORABLE_METADATA_PATH, content: encodeJson(metadata) },
+  await writeCommit(repoId, "Update voxel metadata", [
+    { path: VOXEL_METADATA_PATH, content: encodeJson(metadata) },
   ]);
 };
 
@@ -187,7 +187,7 @@ export const createConversationInRepo = async (
 
   await writeCommit(repoId, "Create conversation", [
     {
-      path: ADORABLE_METADATA_PATH,
+      path: VOXEL_METADATA_PATH,
       content: encodeJson(nextMetadata),
     },
     {
@@ -247,7 +247,7 @@ export const saveConversationMessages = async (
 
   await writeCommit(repoId, "Update conversation", [
     {
-      path: ADORABLE_METADATA_PATH,
+      path: VOXEL_METADATA_PATH,
       content: encodeJson(nextMetadata),
     },
     {
@@ -277,7 +277,7 @@ export const addRepoDeployment = async (
 
   await writeCommit(repoId, "Record deployment", [
     {
-      path: ADORABLE_METADATA_PATH,
+      path: VOXEL_METADATA_PATH,
       content: encodeJson(nextMetadata),
     },
   ]);
@@ -298,7 +298,7 @@ export const setRepoProductionDomain = async (
 
   await writeCommit(repoId, "Configure production domain", [
     {
-      path: ADORABLE_METADATA_PATH,
+      path: VOXEL_METADATA_PATH,
       content: encodeJson(nextMetadata),
     },
   ]);
@@ -319,7 +319,7 @@ export const promoteRepoDeploymentToProduction = async (
 
   await writeCommit(repoId, "Promote deployment to production", [
     {
-      path: ADORABLE_METADATA_PATH,
+      path: VOXEL_METADATA_PATH,
       content: encodeJson(nextMetadata),
     },
   ]);

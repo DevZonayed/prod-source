@@ -23,6 +23,8 @@ import {
   XIcon,
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useErrorDetection } from "@/hooks/use-error-detection";
+import { ErrorPopup } from "@/components/assistant-ui/error-popup";
 
 type TerminalTab = {
   id: string;
@@ -141,9 +143,9 @@ export function RepoWorkspaceShell({
       void loadRepos();
     };
 
-    window.addEventListener("adorable:repos-updated", handleReposUpdated);
+    window.addEventListener("voxel:repos-updated", handleReposUpdated);
     return () => {
-      window.removeEventListener("adorable:repos-updated", handleReposUpdated);
+      window.removeEventListener("voxel:repos-updated", handleReposUpdated);
     };
   }, [loadRepos]);
 
@@ -157,12 +159,12 @@ export function RepoWorkspaceShell({
     };
 
     window.addEventListener(
-      "adorable:thread-state",
+      "voxel:thread-state",
       handleThreadState as EventListener,
     );
     return () => {
       window.removeEventListener(
-        "adorable:thread-state",
+        "voxel:thread-state",
         handleThreadState as EventListener,
       );
     };
@@ -214,12 +216,12 @@ export function RepoWorkspaceShell({
     };
 
     window.addEventListener(
-      "adorable:metadata-optimistic",
+      "voxel:metadata-optimistic",
       handleOptimisticMetadata as EventListener,
     );
     return () => {
       window.removeEventListener(
-        "adorable:metadata-optimistic",
+        "voxel:metadata-optimistic",
         handleOptimisticMetadata as EventListener,
       );
     };
@@ -237,6 +239,7 @@ export function RepoWorkspaceShell({
     : null;
   const showWorkspacePanel = Boolean(repoId);
   const isMobile = useIsMobile();
+  const { latestError, fixError, dismissError } = useErrorDetection();
   const [mobileView, setMobileView] = useState<"chat" | "preview">("chat");
 
   // Reset to chat view when navigating away
@@ -341,13 +344,13 @@ export function RepoWorkspaceShell({
                     onClick={() => {
                       if (selectedConversationId) {
                         window.dispatchEvent(
-                          new CustomEvent("adorable:go-to-repo", {
+                          new CustomEvent("voxel:go-to-repo", {
                             detail: { repoId },
                           }),
                         );
                         router.push(`/${repoId}`);
                       } else {
-                        window.dispatchEvent(new Event("adorable:go-home"));
+                        window.dispatchEvent(new Event("voxel:go-home"));
                         router.push("/");
                       }
                     }}
@@ -452,6 +455,12 @@ export function RepoWorkspaceShell({
                 ))}
             </div>
           </div>
+
+          <ErrorPopup
+            error={latestError}
+            onFix={fixError}
+            onDismiss={dismissError}
+          />
 
           {/* Mobile floating toggle button */}
           {isMobile && showWorkspacePanel && (

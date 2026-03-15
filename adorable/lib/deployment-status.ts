@@ -1,6 +1,6 @@
 import { freestyle } from "freestyle-sandboxes";
 
-export const DEPLOYMENT_DOMAIN_SUFFIX = "adorable.style.dev";
+export const DEPLOYMENT_DOMAIN_SUFFIX = "voxel.style.dev";
 
 export type DeploymentUiStatus = {
   state: "idle" | "deploying" | "live" | "failed";

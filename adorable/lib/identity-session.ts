@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { freestyle } from "freestyle-sandboxes";
 
-export const ADORABLE_IDENTITY_COOKIE = "adorable_identity_id";
+export const VOXEL_IDENTITY_COOKIE = "voxel_identity_id";
 
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
@@ -17,7 +17,7 @@ const isIdentityValid = async (identityId: string): Promise<boolean> => {
 
 export const getOrCreateIdentitySession = async () => {
   const cookieStore = await cookies();
-  const existing = cookieStore.get(ADORABLE_IDENTITY_COOKIE)?.value;
+  const existing = cookieStore.get(VOXEL_IDENTITY_COOKIE)?.value;
 
   if (existing && (await isIdentityValid(existing))) {
     return {
@@ -28,7 +28,7 @@ export const getOrCreateIdentitySession = async () => {
 
   const { identityId, identity } = await freestyle.identities.create({});
 
-  cookieStore.set(ADORABLE_IDENTITY_COOKIE, identityId, {
+  cookieStore.set(VOXEL_IDENTITY_COOKIE, identityId, {
     path: "/",
     maxAge: COOKIE_MAX_AGE_SECONDS,
     httpOnly: true,

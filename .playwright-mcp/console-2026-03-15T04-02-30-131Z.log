@@ -1,0 +1,10 @@
+[   38786ms] [ERROR] Failed to load resource: the server responded with a status of 503 () @ https://8dc929f6-fcf7-42c1-8fbf-2fcebb83dc39-voxel.style.dev/:0
+[   38786ms] [ERROR] Failed to load resource: the server responded with a status of 503 () @ https://8dc929f6-fcf7-42c1-8fbf-2fcebb83dc39-voxel.style.dev/:0
+[   38809ms] [ERROR] Failed to load resource: the server responded with a status of 503 () @ https://885468e4-0d92-4a43-b01f-7f19d7ca80e7-voxel.style.dev/:0
+[   38786ms] [ERROR] Failed to load resource: the server responded with a status of 503 () @ https://8dc929f6-fcf7-42c1-8fbf-2fcebb83dc39-voxel.style.dev/:0
+[   38809ms] [ERROR] Failed to load resource: the server responded with a status of 503 () @ https://885468e4-0d92-4a43-b01f-7f19d7ca80e7-voxel.style.dev/:0
+[   39279ms] [ERROR] Failed to load resource: the server responded with a status of 503 () @ https://6aa59315-8099-4d93-9695-5109915ccd96-voxel.style.dev/:0
+[   58543ms] [WARNING] Image with src "/placeholder-freestyle-logo.svg" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading @ https://4b9a309f-36e5-4a3c-9cfe-8bb17c1f8327-voxel.style.dev/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297
+[  938770ms] [ERROR] WebSocket connection to 'ws://localhost:3005/_next/webpack-hmr?id=oOY0V6lNLBqiGjrR_8SS1' failed:  @ http://localhost:3005/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
+[  938770ms] [ERROR] WebSocket connection to 'wss://4b9a309f-36e5-4a3c-9cfe-8bb17c1f8327-voxel.style.dev/_next/webpack-hmr?id=DOtYD4OxsFJrlcrdU5rYu' failed:  @ https://4b9a309f-36e5-4a3c-9cfe-8bb17c1f8327-voxel.style.dev/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878

@@ -1,6 +1,10 @@
 "use client";
 
-import { AssistantRuntimeProvider, useAuiState } from "@assistant-ui/react";
+import {
+  AssistantRuntimeProvider,
+  useAuiState,
+  useThreadRuntime,
+} from "@assistant-ui/react";
 import {
   useAISDKRuntime,
   AssistantChatTransport,
@@ -102,9 +106,9 @@ export const Assistant = ({
       setRuntimeVersion((version) => version + 1);
     };
 
-    window.addEventListener("adorable:go-home", handleGoHome);
+    window.addEventListener("voxel:go-home", handleGoHome);
     return () => {
-      window.removeEventListener("adorable:go-home", handleGoHome);
+      window.removeEventListener("voxel:go-home", handleGoHome);
     };
   }, []);
 
@@ -124,12 +128,12 @@ export const Assistant = ({
     };
 
     window.addEventListener(
-      "adorable:go-to-repo",
+      "voxel:go-to-repo",
       handleGoToRepo as EventListener,
     );
     return () => {
       window.removeEventListener(
-        "adorable:go-to-repo",
+        "voxel:go-to-repo",
         handleGoToRepo as EventListener,
       );
     };
@@ -172,20 +176,20 @@ export const Assistant = ({
       setRuntimeVersion((version) => version + 1);
       onActiveConversationChangeRef.current?.(repoId, conversationId);
       window.dispatchEvent(
-        new CustomEvent("adorable:active-conversation", {
+        new CustomEvent("voxel:active-conversation", {
           detail: { repoId, conversationId },
         }),
       );
-      window.dispatchEvent(new Event("adorable:repos-updated"));
+      window.dispatchEvent(new Event("voxel:repos-updated"));
     };
 
     window.addEventListener(
-      "adorable:create-from-github",
+      "voxel:create-from-github",
       handleCreateFromGithub as EventListener,
     );
     return () => {
       window.removeEventListener(
-        "adorable:create-from-github",
+        "voxel:create-from-github",
         handleCreateFromGithub as EventListener,
       );
     };
@@ -238,7 +242,7 @@ export const Assistant = ({
         activeConversationIdRef.current = conversationId;
         onActiveConversationChangeRef.current?.(activeRepoId, conversationId);
         window.dispatchEvent(
-          new CustomEvent("adorable:active-conversation", {
+          new CustomEvent("voxel:active-conversation", {
             detail: { repoId: activeRepoId, conversationId },
           }),
         );
@@ -285,7 +289,7 @@ export const Assistant = ({
       activeConversationIdRef.current = conversationId;
       onActiveConversationChangeRef.current?.(repoId, conversationId);
       window.dispatchEvent(
-        new CustomEvent("adorable:active-conversation", {
+        new CustomEvent("voxel:active-conversation", {
           detail: { repoId, conversationId },
         }),
       );
@@ -304,7 +308,7 @@ export const Assistant = ({
     (next: ThreadState) => {
       onThreadStateChange?.(next);
       window.dispatchEvent(
-        new CustomEvent("adorable:thread-state", {
+        new CustomEvent("voxel:thread-state", {
           detail: {
             repoId: activeRepoIdRef.current,
             isRunning: next.isRunning,
@@ -320,7 +324,7 @@ export const Assistant = ({
     if (!repoId) return;
 
     window.dispatchEvent(
-      new CustomEvent("adorable:repos-updated", {
+      new CustomEvent("voxel:repos-updated", {
         detail: { repoId },
       }),
     );
@@ -345,7 +349,7 @@ export const Assistant = ({
 
         if (prompt) {
           window.dispatchEvent(
-            new CustomEvent("adorable:metadata-optimistic", {
+            new CustomEvent("voxel:metadata-optimistic", {
               detail: {
                 repoId: active.repoId,
                 conversationId: active.conversationId,
@@ -379,10 +383,39 @@ export const Assistant = ({
   return (
     <AssistantRuntimeProvider key={runtimeKey} runtime={runtime}>
       <ThreadStateBridge onThreadStateChange={handleThreadStateChange} />
+      <AutoPromptBridge />
       <Thread welcome={welcome} />
     </AssistantRuntimeProvider>
   );
 };
+
+function AutoPromptBridge() {
+  const threadRuntime = useThreadRuntime();
+
+  useEffect(() => {
+    const handleAutoPrompt = (event: Event) => {
+      const customEvent = event as CustomEvent<{ text: string }>;
+      const text = customEvent.detail?.text?.trim();
+      if (!text) return;
+      threadRuntime.append({
+        role: "user",
+        content: [{ type: "text", text }],
+      });
+    };
+
+    window.addEventListener(
+      "voxel:auto-prompt",
+      handleAutoPrompt as EventListener,
+    );
+    return () =>
+      window.removeEventListener(
+        "voxel:auto-prompt",
+        handleAutoPrompt as EventListener,
+      );
+  }, [threadRuntime]);
+
+  return null;
+}
 
 function ThreadStateBridge({
   onThreadStateChange,

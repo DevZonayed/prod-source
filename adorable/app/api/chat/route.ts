@@ -1,10 +1,13 @@
 import { type UIMessage } from "ai";
 import { cookies } from "next/headers";
 import { freestyle } from "freestyle-sandboxes";
-import { adorableVmSpec } from "@/lib/adorable-vm";
+import { voxelVmSpec } from "@/lib/voxel-vm";
 import { getOrCreateIdentitySession } from "@/lib/identity-session";
 import { readRepoMetadata, saveConversationMessages } from "@/lib/repo-storage";
 import { getClaudeAccessToken } from "@/lib/claude-auth";
+
+// ─── Claude CLI provider (OAuth requires CLI binary) ───
+import { createClaudeCliStreamResponse } from "@/lib/claude-cli-provider";
 
 // ─── CodeMine (new agentic engine) ───
 import { createCodeMineTools, runAgenticLoop, buildCodeMinePrompt, CODEMINE_SYSTEM_PROMPT } from "@/lib/codemine";
@@ -14,7 +17,7 @@ import type { AgenticLoopState } from "@/lib/codemine";
 import { createTools as createBaseTools } from "@/lib/create-tools";
 import { streamLlmResponse } from "@/lib/llm-provider";
 import { buildSystemPrompt, SYSTEM_PROMPT } from "@/lib/system-prompt";
-import { getToolsForPhase, detectPhase, getProjectMemoryState, readSpec } from "@/lib/buildforge";
+import { getBuildForgeTools, getProjectMemoryState, readSpec } from "@/lib/buildforge";
 import type { BuildForgeContext } from "@/lib/buildforge";
 
 const AGENT_MODE = (process.env["AGENT_MODE"] ?? "codemine").toLowerCase();
@@ -64,7 +67,7 @@ export async function POST(req: Request) {
 
   const vm = freestyle.vms.ref({
     vmId: metadata.vm.vmId,
-    spec: adorableVmSpec,
+    spec: voxelVmSpec,
   });
 
   // ─── LLM Auth (shared by both modes) ───
@@ -93,16 +96,18 @@ export async function POST(req: Request) {
     );
   }
 
+  // For claude-code: no apiKey passed — the custom fetch in llm-provider
+  // reads a fresh token from ~/.claude/.credentials.json on every HTTP call.
   let llmOptions: { apiKey?: string; providerOverride?: string; modelOverride?: string } = {};
 
   if (envForcesClaudeCode && hasClaudeCode) {
-    llmOptions = { apiKey: claudeToken!, providerOverride: "claude-code", modelOverride: userModel };
+    llmOptions = { providerOverride: "claude-code", modelOverride: userModel };
   } else if (hasGlobalKey) {
     llmOptions = { modelOverride: userModel };
   } else if (userApiKey) {
     llmOptions = { apiKey: userApiKey, providerOverride: userProvider, modelOverride: userModel };
   } else if (hasClaudeCode) {
-    llmOptions = { apiKey: claudeToken!, providerOverride: "claude-code", modelOverride: userModel };
+    llmOptions = { providerOverride: "claude-code", modelOverride: userModel };
   }
 
   console.log("[LLM Auth]", JSON.stringify({
@@ -112,12 +117,7 @@ export async function POST(req: Request) {
     hasUserCookie: !!userApiKey,
     userProvider: userProvider ?? null,
     hasClaudeCode,
-    claudeTokenPrefix: claudeToken ? claudeToken.slice(0, 20) + "..." : null,
     chosenPath: llmOptions.providerOverride ?? (hasGlobalKey ? "global-env" : "unknown"),
-    llmOptions: {
-      ...llmOptions,
-      apiKey: llmOptions.apiKey ? llmOptions.apiKey.slice(0, 15) + "..." : undefined,
-    },
   }, null, 2));
 
   // ─── Extract latest user message ───
@@ -131,7 +131,33 @@ export async function POST(req: Request) {
       : "";
 
   // ═══════════════════════════════════════
-  // CodeMine Agentic Engine (default)
+  // Claude CLI Mode (OAuth requires CLI binary for attestation)
+  // --system-prompt-file REPLACES the CLI's default identity prompt entirely.
+  // Only YOUR prompt is sent — no "You are Claude Code" baggage.
+  // ═══════════════════════════════════════
+  if (llmOptions.providerOverride === "claude-code" && !hasGlobalKey && !userApiKey) {
+    console.log("[Chat] Using Claude CLI binary (OAuth requires CLI attestation)");
+
+    // Build YOUR system prompt (this REPLACES the CLI default via --system-prompt-file)
+    let systemPrompt: string;
+    try {
+      systemPrompt = AGENT_MODE === "codemine"
+        ? await buildCodeMinePrompt(vm, userText)
+        : await buildSystemPrompt(vm, userText);
+    } catch {
+      systemPrompt = AGENT_MODE === "codemine" ? CODEMINE_SYSTEM_PROMPT : SYSTEM_PROMPT;
+    }
+
+    return createClaudeCliStreamResponse(messages, {
+      systemPrompt,
+      model: llmOptions.modelOverride ?? "sonnet",
+      conversationId,
+      maxTurns: 200,
+    });
+  }
+
+  // ═══════════════════════════════════════
+  // CodeMine Agentic Engine (default — requires API key)
   // ═══════════════════════════════════════
   if (AGENT_MODE === "codemine") {
     // Build CodeMine tools with shared loop state
@@ -217,8 +243,7 @@ export async function POST(req: Request) {
       activePlan: null,
     };
 
-    const phase = detectPhase(bfContext);
-    buildForgeTools = getToolsForPhase(phase, vm, bfContext);
+    buildForgeTools = getBuildForgeTools(vm, bfContext);
   } catch (e) {
     console.error("BuildForge tools initialization failed:", e);
   }

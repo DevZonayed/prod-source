@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Adorable",
+  title: "Voxel",
   description: "Build beautiful apps with AI",
 };
 
