@@ -3,7 +3,7 @@
 // The core innovation — assembles precisely the right context for each task.
 // =============================================================================
 
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import type {
   AssembledContext,
   ContextAssemblyRequest,

@@ -3,7 +3,7 @@
 // The shared type system that flows through every BuildForge module.
 // =============================================================================
 
-import { type Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 
 // -----------------------------------------------------------------------------
 // Specification Types

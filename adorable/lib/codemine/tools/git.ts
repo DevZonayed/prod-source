@@ -1,10 +1,6 @@
 import { tool } from "ai";
-import type { Vm } from "freestyle-sandboxes";
-import { freestyle } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import { z } from "zod";
-import { WORKDIR } from "../../vars";
-import { getDomainForCommit } from "../../deployment-status";
-import { addRepoDeployment, readRepoMetadata } from "../../repo-storage";
 import { runVmCommand, shellQuote } from "./helpers";
 
 type GitToolsOptions = {
@@ -16,8 +12,9 @@ type GitToolsOptions = {
  * Creates the 6 git tools: git_diff, git_log, git_status, git_commit, git_checkout, git_stash
  */
 export function createGitTools(vm: Vm, options?: GitToolsOptions) {
+  // LocalVm's exec() already runs with cwd=projectDir, so no cd needed
   const gitCmd = (cmd: string) =>
-    runVmCommand(vm, `cd ${shellQuote(WORKDIR)} && git ${cmd}`);
+    runVmCommand(vm, `git ${cmd}`);
 
   return {
     git_diff: tool({
@@ -82,8 +79,8 @@ export function createGitTools(vm: Vm, options?: GitToolsOptions) {
       }),
       execute: async ({ Message }) => {
         // Configure git user
-        await gitCmd(`config user.name "Adorable"`);
-        await gitCmd(`config user.email "adorable@freestyle.sh"`);
+        await gitCmd(`config user.name "Voxel"`);
+        await gitCmd(`config user.email "voxel@local"`);
 
         // Stage and commit
         const commitResult = await gitCmd(
@@ -99,89 +96,14 @@ export function createGitTools(vm: Vm, options?: GitToolsOptions) {
           };
         }
 
-        // Pull --rebase and push
+        // Pull --rebase and push (if remote configured)
         await gitCmd("pull --rebase --no-edit 2>/dev/null || true");
-        const pushResult = await gitCmd("push 2>&1");
-
-        // Trigger async deployment if configured
-        if (options?.sourceRepoId && options?.metadataRepoId) {
-          (async () => {
-            try {
-              const headResult = await gitCmd(
-                "rev-parse --short=7 HEAD",
-              );
-              const sha = headResult.stdout.trim();
-              if (!sha) return;
-
-              const domain = getDomainForCommit(sha);
-              const metadata = await readRepoMetadata(
-                options.metadataRepoId!,
-              );
-              if (!metadata) return;
-
-              await addRepoDeployment(
-                options.metadataRepoId!,
-                metadata,
-                {
-                  commitSha: sha,
-                  commitMessage: Message,
-                  commitDate: new Date().toISOString(),
-                  domain,
-                  url: `https://${domain}`,
-                  deploymentId: null,
-                  state: "deploying",
-                },
-              );
-
-              const deployment =
-                await freestyle.serverless.deployments.create({
-                  repo: options.sourceRepoId!,
-                  domains: [domain],
-                  build: true,
-                });
-
-              const deploymentId =
-                deployment &&
-                typeof deployment === "object" &&
-                "id" in deployment
-                  ? String(
-                      (deployment as Record<string, unknown>).id ?? "",
-                    ) || null
-                  : null;
-
-              if (deploymentId) {
-                const latestMetadata = await readRepoMetadata(
-                  options.metadataRepoId!,
-                );
-                if (latestMetadata) {
-                  await addRepoDeployment(
-                    options.metadataRepoId!,
-                    latestMetadata,
-                    {
-                      commitSha: sha,
-                      commitMessage: Message,
-                      commitDate: new Date().toISOString(),
-                      domain,
-                      url: `https://${domain}`,
-                      deploymentId,
-                      state: "deploying",
-                    },
-                  );
-                }
-              }
-            } catch (e) {
-              console.error("Deployment trigger failed:", e);
-            }
-          })();
-        }
+        const pushResult = await gitCmd("push 2>&1 || true");
 
         return {
           ok: true,
           stdout: commitResult.stdout,
           pushResult: pushResult.stdout,
-          deploymentQueued: !!(
-            options?.sourceRepoId && options?.metadataRepoId
-          ),
         };
       },
     }),

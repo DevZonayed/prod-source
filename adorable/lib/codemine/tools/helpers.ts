@@ -1,5 +1,20 @@
-import type { Vm } from "freestyle-sandboxes";
-import { WORKDIR } from "../../vars";
+import type { Vm } from "@/lib/local-vm";
+import type { LocalVm } from "@/lib/local-vm";
+
+/**
+ * Get the effective WORKDIR for a VM.
+ * In local mode, this is the project directory.
+ * Falls back to "/workspace" for compatibility with system prompts.
+ */
+function getWorkdir(vm: Vm): string {
+  if ("getProjectDir" in vm && typeof (vm as LocalVm).getProjectDir === "function") {
+    return (vm as LocalVm).getProjectDir();
+  }
+  return "/workspace";
+}
+
+// Legacy WORKDIR constant — the AI's system prompt references /workspace
+const LEGACY_WORKDIR = "/workspace";
 
 /**
  * Validates and normalizes a relative path. Returns null for invalid paths.
@@ -19,27 +34,39 @@ export function normalizeRelativePath(rawPath: string): string | null {
 
 /**
  * Resolves an absolute path within the VM workspace.
- * If the path is already absolute and starts with WORKDIR, validates it.
- * If relative, prepends WORKDIR.
+ * Accepts both real project paths and legacy /workspace paths.
+ * If relative, prepends the VM's workdir.
  * Returns null for paths escaping the workspace.
  */
-export function resolveAbsPath(path: string): string | null {
+export function resolveAbsPath(path: string, vm?: Vm): string | null {
   const trimmed = path.trim();
   if (!trimmed || trimmed.includes("\0")) return null;
 
+  const workdir = vm ? getWorkdir(vm) : LEGACY_WORKDIR;
+
   // Already absolute
   if (trimmed.startsWith("/")) {
-    // Must be within WORKDIR
-    if (!trimmed.startsWith(WORKDIR + "/") && trimmed !== WORKDIR) return null;
-    // Check for traversal
-    if (trimmed.includes("/../") || trimmed.endsWith("/..")) return null;
-    return trimmed;
+    // Translate legacy /workspace paths to the real project dir
+    if (trimmed.startsWith(LEGACY_WORKDIR + "/") || trimmed === LEGACY_WORKDIR) {
+      const relative = trimmed === LEGACY_WORKDIR ? "" : trimmed.slice(LEGACY_WORKDIR.length + 1);
+      if (trimmed.includes("/../") || trimmed.endsWith("/..")) return null;
+      return relative ? `${workdir}/${relative}` : workdir;
+    }
+
+    // Real project directory paths
+    if (trimmed.startsWith(workdir + "/") || trimmed === workdir) {
+      if (trimmed.includes("/../") || trimmed.endsWith("/..")) return null;
+      return trimmed;
+    }
+
+    // Unknown absolute path — reject
+    return null;
   }
 
   // Relative path
   const rel = normalizeRelativePath(trimmed);
   if (!rel) return null;
-  return rel === "." ? WORKDIR : `${WORKDIR}/${rel}`;
+  return rel === "." ? workdir : `${workdir}/${rel}`;
 }
 
 /**

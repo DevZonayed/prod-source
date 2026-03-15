@@ -1,0 +1,18 @@
+services:
+  voxel:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+      - "4100-4199:4100-4199"
+    volumes:
+      - ${VOXEL_DATA_DIR:-~/.voxel/data}:/data
+      - ${VOXEL_PROJECTS_DIR:-~/.voxel/projects}:/projects
+      - ${HOST_WORKSPACE:-~/Projects}:/host-projects
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-}
+      - AGENT_MODE=${AGENT_MODE:-codemine}
+    restart: unless-stopped

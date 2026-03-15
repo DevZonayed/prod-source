@@ -1,5 +1,5 @@
 import type { ToolSet } from "ai";
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import type { AgenticLoopState } from "../types";
 import { createFilesystemTools } from "./filesystem";
 import { createSearchTools } from "./search";

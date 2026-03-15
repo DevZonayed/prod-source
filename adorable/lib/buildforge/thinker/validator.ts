@@ -3,7 +3,7 @@
 // Validates generated code by running TypeScript, lint, and runtime checks.
 // =============================================================================
 
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import type { ValidationResult, ValidationIssue } from "../types";
 import { WORKDIR } from "../../vars";
 

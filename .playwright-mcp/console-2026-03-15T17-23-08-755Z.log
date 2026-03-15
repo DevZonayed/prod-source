@@ -1,0 +1,2 @@
+[     724ms] [WARNING] Image with src "/placeholder-freestyle-logo.svg" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading @ http://localhost:4100/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297

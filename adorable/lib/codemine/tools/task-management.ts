@@ -1,7 +1,7 @@
 import { tool } from "ai";
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import { z } from "zod";
-import { WORKDIR } from "../../vars";
+
 import type { AgentMode, AgenticLoopState } from "../types";
 import { BRAIN_DIR } from "../constants";
 import { ensureDir, writeVmFile, readVmFile } from "./helpers";
@@ -10,7 +10,7 @@ import { ensureDir, writeVmFile, readVmFile } from "./helpers";
  * Creates the 2 task management tools: task_boundary, notify_user
  */
 export function createTaskManagementTools(vm: Vm, state: AgenticLoopState) {
-  const brainPath = `${WORKDIR}/${BRAIN_DIR}/${state.conversationId}`;
+  const brainPath = `./${BRAIN_DIR}/${state.conversationId}`;
 
   return {
     task_boundary: tool({

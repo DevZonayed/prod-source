@@ -1,4 +1,4 @@
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import { WORKDIR } from "../vars";
 import { BRAIN_DIR } from "./constants";
 import { ensureDir, writeVmFile, readVmFile } from "./tools/helpers";

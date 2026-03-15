@@ -5,7 +5,7 @@
 // =============================================================================
 
 import type { ToolSet } from "ai";
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import type { BuildForgeContext } from "../types";
 import { createMemoryTools } from "./memory";
 

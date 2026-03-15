@@ -25,11 +25,14 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useErrorDetection } from "@/hooks/use-error-detection";
 import { ErrorPopup } from "@/components/assistant-ui/error-popup";
+import { XTerminal } from "@/components/xterm-terminal";
+import { useDevServer } from "@/hooks/use-dev-server";
+import { useContainer } from "@/hooks/use-container";
 
 type TerminalTab = {
   id: string;
   label: string;
-  url: string;
+  sessionId: string;
   closable: boolean;
 };
 
@@ -443,16 +446,13 @@ export function RepoWorkspaceShell({
                 isMobile && mobileView === "chat" && "hidden",
               )}
             >
-              {showWorkspacePanel &&
-                (selectedRepo?.vm?.previewUrl ? (
-                  <AppPreview
-                    metadata={selectedRepo.vm}
-                    iframeRef={iframeRef}
-                    repoId={repoId!}
-                  />
-                ) : (
-                  <PreviewPlaceholder />
-                ))}
+              {showWorkspacePanel && repoId && (
+                <AppPreview
+                  metadata={selectedRepo?.vm ?? null}
+                  iframeRef={iframeRef}
+                  repoId={repoId}
+                />
+              )}
             </div>
           </div>
 
@@ -539,7 +539,7 @@ function AppPreview({
   iframeRef,
   repoId,
 }: {
-  metadata: RepoVmInfo;
+  metadata: RepoVmInfo | null;
   iframeRef: React.RefObject<HTMLIFrameElement | null>;
   repoId: string;
 }) {
@@ -547,35 +547,37 @@ function AppPreview({
   const [activeTab, setActiveTab] = useState("dev-server");
   const [counter, setCounter] = useState(1);
   const [iframeLoaded, setIframeLoaded] = useState(false);
-  const [loadedTerminals, setLoadedTerminals] = useState<Set<string>>(
-    new Set(),
-  );
   const [terminalOpen, setTerminalOpen] = useState(false);
 
-  const markTerminalLoaded = useCallback((id: string) => {
-    setLoadedTerminals((prev) => new Set(prev).add(id));
-  }, []);
+  // Auto-create container, then start dev server once container is ready
+  const { containerReady, loading: containerLoading, error: containerError } = useContainer(repoId);
+  const { previewUrl: livePreviewUrl, running: devServerRunning, loading: devServerLoading, error: devServerError } = useDevServer(repoId, containerReady);
+
+  // Use live URL from dev-server-manager, or fall back to metadata
+  // Filter out placeholder URLs (the app's own port is not a valid preview)
+  const metadataUrl = metadata?.previewUrl || null;
+  const isPlaceholder = metadataUrl && (metadataUrl.includes(`:${3000}`) || metadataUrl.includes(`:${4000}`));
+  const effectivePreviewUrl = livePreviewUrl || (isPlaceholder ? null : metadataUrl);
 
   useEffect(() => {
     setIframeLoaded(false);
-  }, [metadata.previewUrl]);
+  }, [effectivePreviewUrl]);
 
   const addTerminal = useCallback(() => {
-    if (!metadata.additionalTerminalsUrl) return;
     const id = `terminal-${counter}`;
     setExtraTerminals((prev) => [
       ...prev,
       {
         id,
         label: `Terminal ${counter}`,
-        url: metadata.additionalTerminalsUrl,
+        sessionId: `extra-${counter}`,
         closable: true,
       },
     ]);
     setActiveTab(id);
     setCounter((c) => c + 1);
     setTerminalOpen(true);
-  }, [counter, metadata.additionalTerminalsUrl]);
+  }, [counter]);
 
   const closeTerminal = useCallback(
     (id: string) => {
@@ -586,16 +588,12 @@ function AppPreview({
   );
 
   const allTabs: TerminalTab[] = [
-    ...(metadata.devCommandTerminalUrl
-      ? [
-          {
-            id: "dev-server",
-            label: "Dev Server",
-            url: metadata.devCommandTerminalUrl,
-            closable: false,
-          },
-        ]
-      : []),
+    {
+      id: "dev-server",
+      label: "Dev Server",
+      sessionId: "dev-server",
+      closable: false,
+    },
     ...extraTerminals,
   ];
 
@@ -607,7 +605,7 @@ function AppPreview({
         style={{ flex: terminalOpen ? "1 1 65%" : "1 1 100%" }}
       >
         {/* Loading state */}
-        {!iframeLoaded && (
+        {(!effectivePreviewUrl || !iframeLoaded || devServerLoading || containerLoading) && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
             <div className="flex flex-col items-center gap-3">
               <div className="relative">
@@ -615,20 +613,29 @@ function AppPreview({
                 <Loader2Icon className="relative size-6 animate-spin text-muted-foreground/60" />
               </div>
               <p className="text-sm text-muted-foreground/50">
-                Loading preview...
+                {containerLoading
+                  ? "Preparing environment..."
+                  : devServerLoading || !effectivePreviewUrl
+                    ? "Starting dev server..."
+                    : "Loading preview..."}
               </p>
+              {(containerError || devServerError) && (
+                <p className="text-xs text-destructive">{containerError || devServerError}</p>
+              )}
             </div>
           </div>
         )}
-        <iframe
-          ref={iframeRef}
-          src={metadata.previewUrl}
-          className={cn(
-            "h-full w-full rounded-xl transition-opacity duration-500",
-            iframeLoaded ? "opacity-100" : "opacity-0",
-          )}
-          onLoad={() => setIframeLoaded(true)}
-        />
+        {effectivePreviewUrl && (
+          <iframe
+            ref={iframeRef}
+            src={effectivePreviewUrl}
+            className={cn(
+              "h-full w-full rounded-xl transition-opacity duration-500",
+              iframeLoaded && !devServerLoading ? "opacity-100" : "opacity-0",
+            )}
+            onLoad={() => setIframeLoaded(true)}
+          />
+        )}
       </div>
 
       {/* Terminal panel */}
@@ -693,36 +700,41 @@ function AppPreview({
                 </button>
               ))}
 
-              {metadata.additionalTerminalsUrl && (
-                <button
-                  type="button"
-                  onClick={addTerminal}
-                  className="ml-1 rounded-lg p-1.5 text-muted-foreground transition-all hover:bg-white/5 hover:text-foreground"
-                  title="New terminal"
-                >
-                  <PlusIcon className="size-3.5" />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={addTerminal}
+                className="ml-1 rounded-lg p-1.5 text-muted-foreground transition-all hover:bg-white/5 hover:text-foreground"
+                title="New terminal"
+              >
+                <PlusIcon className="size-3.5" />
+              </button>
             </>
           )}
         </div>
 
         {/* Terminal content */}
         {terminalOpen && (
-          <div className="relative min-h-0 flex-1 bg-[rgb(24,24,24)]">
+          <div className="relative min-h-0 flex-1 bg-[#09090b]">
             {allTabs.map((tab) => (
-              <iframe
+              <div
                 key={tab.id}
-                src={tab.url}
-                className={cn(
-                  "absolute inset-0 h-full w-full transition-opacity duration-300",
-                  loadedTerminals.has(tab.id) ? "opacity-100" : "opacity-0",
-                )}
+                className="absolute inset-0"
                 style={{
                   display: activeTab === tab.id ? "block" : "none",
                 }}
-                onLoad={() => markTerminalLoaded(tab.id)}
-              />
+              >
+                {containerReady ? (
+                  <XTerminal
+                    projectId={repoId}
+                    sessionId={tab.sessionId}
+                    className="h-full w-full"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                    {containerLoading ? "Preparing environment..." : containerError || "Waiting for container..."}
+                  </div>
+                )}
+              </div>
             ))}
             {allTabs.length === 0 && (
               <div className="flex h-full items-center justify-center text-sm text-muted-foreground">

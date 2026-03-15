@@ -30,4 +30,6 @@ export type RepoItem = {
   deployments: RepoDeployment[];
   productionDomain: string | null;
   productionDeploymentId: string | null;
+  framework?: string;
+  source?: "new" | "existing" | "github";
 };

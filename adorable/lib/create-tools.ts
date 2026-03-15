@@ -1,9 +1,6 @@
 import { tool } from "ai";
-import { freestyle, Vm } from "freestyle-sandboxes";
 import { z } from "zod";
-import { getDomainForCommit } from "./deployment-status";
-import { addRepoDeployment, readRepoMetadata } from "./repo-storage";
-import { WORKDIR, VM_PORT } from "./vars";
+import type { Vm } from "@/lib/local-vm";
 
 type CreateToolsOptions = {
   sourceRepoId?: string;
@@ -25,7 +22,7 @@ const shellQuote = (value: string): string => {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 };
 
-export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
+export const createTools = (vm: Vm, _options?: CreateToolsOptions) => {
   const runExecCommand = async (command: string) => {
     const execResult = await vm.exec({ command });
     if (typeof execResult === "string") {
@@ -79,20 +76,9 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
     }
   };
 
-  const getHeadCommitSha = async () => {
-    const result = await runExecCommand(
-      `git -C ${shellQuote(WORKDIR)} rev-parse HEAD`,
-    );
-    if (!result.ok) return null;
-
-    const sha = result.stdout.trim().split("\n")[0]?.trim();
-    if (!sha || !/^[0-9a-f]{7,40}$/i.test(sha)) return null;
-    return sha;
-  };
-
   const bashTool = tool({
     description:
-      "Run a bash command inside the Adorable VM and return its output.",
+      "Run a bash command inside the project workspace and return its output.",
     inputSchema: z.object({
       command: z.string().min(1).describe("The bash command to execute."),
     }),
@@ -103,7 +89,7 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
 
   const readFileTool = tool({
     description:
-      "Read the content of a file in the Adorable VM. Input is the file path relative to the workdir.",
+      "Read the content of a file in the project workspace. Input is the file path relative to the workdir.",
     inputSchema: z
       .object({
         file: z.string().min(1).describe("The path of the file to read."),
@@ -122,7 +108,7 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
 
   const writeFileTool = tool({
     description:
-      "Write content to a file in the Adorable VM. Input is the file path relative to the workdir and the content to write. For writing multiple files, prefer batchWriteFilesTool instead.",
+      "Write content to a file in the project workspace. Input is the file path relative to the workdir and the content to write. For writing multiple files, prefer batchWriteFilesTool instead.",
     inputSchema: z
       .object({
         file: z.string().min(1).describe("The path of the file to write."),
@@ -170,8 +156,8 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
       if (!safePath) return { ok: false, error: "Invalid path." };
 
       const command = recursive
-        ? `cd ${shellQuote(WORKDIR)} && find ${shellQuote(safePath)} -maxdepth ${maxDepth} -print | sed 's#^\\./##'`
-        : `cd ${shellQuote(WORKDIR)} && ls -la ${shellQuote(safePath)}`;
+        ? `find ${shellQuote(safePath)} -maxdepth ${maxDepth} -print | sed 's#^\\./##'`
+        : `ls -la ${shellQuote(safePath)}`;
 
       const result = await runExecCommand(command);
       return { ...result, path: safePath, recursive, maxDepth };
@@ -198,7 +184,7 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
       const safePath = normalizeRelativePath(path ?? ".");
       if (!safePath) return { ok: false, error: "Invalid path." };
 
-      const command = `cd ${shellQuote(WORKDIR)} && grep -RIn --exclude-dir=node_modules --exclude-dir=.next -- ${shellQuote(query)} ${shellQuote(safePath)} | head -n ${maxResults}`;
+      const command = `grep -RIn --exclude-dir=node_modules --exclude-dir=.next -- ${shellQuote(query)} ${shellQuote(safePath)} | head -n ${maxResults}`;
       const result = await runExecCommand(command);
       return { ...result, query, path: safePath, maxResults };
     },
@@ -286,9 +272,7 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
     execute: async ({ path }) => {
       const safePath = normalizeRelativePath(path);
       if (!safePath) return { ok: false, error: "Invalid path." };
-      return runExecCommand(
-        `cd ${shellQuote(WORKDIR)} && mkdir -p ${shellQuote(safePath)}`,
-      );
+      return runExecCommand(`mkdir -p ${shellQuote(safePath)}`);
     },
   });
 
@@ -307,7 +291,7 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
         return { ok: false, error: "Invalid source or destination path." };
       }
       return runExecCommand(
-        `cd ${shellQuote(WORKDIR)} && mv ${shellQuote(safeFrom)} ${shellQuote(safeTo)}`,
+        `mv ${shellQuote(safeFrom)} ${shellQuote(safeTo)}`,
       );
     },
   });
@@ -322,9 +306,7 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
     execute: async ({ path }) => {
       const safePath = normalizeRelativePath(path);
       if (!safePath) return { ok: false, error: "Invalid path." };
-      return runExecCommand(
-        `cd ${shellQuote(WORKDIR)} && rm -rf ${shellQuote(safePath)}`,
-      );
+      return runExecCommand(`rm -rf ${shellQuote(safePath)}`);
     },
   });
 
@@ -368,83 +350,41 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
 
   const commitTool = tool({
     description:
-      "Stage all current changes, commit them, and push them to the remote repository. You should use this at any point you think the user would have value returning to. Always commit and push your changes when you finish a task.",
+      "Stage all current changes, commit them, and push if a remote is configured. Always commit your changes when you finish a task.",
     inputSchema: z
       .object({
         message: z.string().min(1).describe("Commit message."),
       })
       .passthrough(),
     execute: async ({ message }) => {
-      const gitCommand = `git -C ${shellQuote(WORKDIR)} config user.name ${shellQuote(
-        "Adorable",
-      )} && git -C ${shellQuote(WORKDIR)} config user.email ${shellQuote(
-        "adorable@freestyle.sh",
-      )} && git -C ${shellQuote(WORKDIR)} commit -am ${shellQuote(
-        message,
-      )} && git -C ${shellQuote(WORKDIR)} pull --rebase && git -C ${shellQuote(
-        WORKDIR,
-      )} push`;
+      // Configure git user, stage, commit
+      const gitCommand = [
+        `git config user.name 'Voxel'`,
+        `git config user.email 'voxel@local'`,
+        `git add -A`,
+        `git commit -m ${shellQuote(message)}`,
+      ].join(" && ");
+
       const commitResult = await runExecCommand(gitCommand);
 
-      if (commitResult.ok && options?.sourceRepoId && options?.metadataRepoId) {
-        void (async () => {
-          const commitSha = await getHeadCommitSha();
-          if (!commitSha) return;
-
-          const deploymentDomain = getDomainForCommit(commitSha);
-          const metadata = await readRepoMetadata(options.metadataRepoId!);
-          if (!metadata) return;
-
-          await addRepoDeployment(options.metadataRepoId!, metadata, {
-            commitSha,
-            commitMessage: message,
-            commitDate: new Date().toISOString(),
-            domain: deploymentDomain,
-            url: `https://${deploymentDomain}`,
-            deploymentId: null,
-            state: "deploying",
-          });
-
-          const deployment = await freestyle.serverless.deployments.create({
-            repo: options.sourceRepoId!,
-            domains: [deploymentDomain],
-            build: true,
-          });
-
-          const deploymentId =
-            deployment && typeof deployment === "object" && "id" in deployment
-              ? String((deployment as Record<string, unknown>).id ?? "") || null
-              : null;
-
-          const latestMetadata = await readRepoMetadata(
-            options.metadataRepoId!,
-          );
-          if (!latestMetadata) return;
-
-          await addRepoDeployment(options.metadataRepoId!, latestMetadata, {
-            commitSha,
-            commitMessage: message,
-            commitDate: new Date().toISOString(),
-            domain: deploymentDomain,
-            url: `https://${deploymentDomain}`,
-            deploymentId,
-            state: "deploying",
-          });
-        })().catch((error) => {
-          console.error("Post-commit deploy failed:", error);
-        });
+      // Try to push if remote exists (non-blocking)
+      if (commitResult.ok) {
+        const pushResult = await runExecCommand(
+          `git remote get-url origin 2>/dev/null && git pull --rebase 2>/dev/null; git push 2>/dev/null || true`,
+        );
+        return {
+          ...commitResult,
+          pushed: pushResult.ok,
+        };
       }
 
-      return {
-        ...commitResult,
-        deploymentQueued: commitResult.ok,
-      };
+      return commitResult;
     },
   });
 
   const checkAppTool = tool({
     description:
-      "Check if the app is running correctly by making an HTTP request to the dev server and scanning Next.js logs for runtime or compile issues. You MUST call this tool before finishing any task to verify the app is not broken. If the status code is not 200 or logs show errors, investigate and fix the issue before telling the user you are done.",
+      "Check if the app is running correctly by making an HTTP request to the dev server and scanning logs for runtime or compile issues. You MUST call this tool before finishing any task to verify the app is not broken.",
     inputSchema: z
       .object({
         path: z
@@ -455,7 +395,8 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
       .passthrough(),
     execute: async ({ path }) => {
       const urlPath = path?.startsWith("/") ? path : `/${path ?? ""}`;
-      const command = `curl -s -o /dev/null -w '{"statusCode":%{http_code},"totalTime":%{time_total},"url":"%{url_effective}"}' http://localhost:${VM_PORT}${urlPath}`;
+      // Try to detect the dev server port from the logs or use default
+      const command = `curl -s -o /dev/null -w '{"statusCode":%{http_code},"totalTime":%{time_total},"url":"%{url_effective}"}' http://localhost:3000${urlPath} 2>/dev/null || curl -s -o /dev/null -w '{"statusCode":%{http_code},"totalTime":%{time_total},"url":"%{url_effective}"}' http://localhost:5173${urlPath} 2>/dev/null`;
       const result = await runExecCommand(command);
       const logsResult = await getDevServerLogs();
       const logText = logsResult.ok && logsResult.logs ? logsResult.logs : "";
@@ -483,7 +424,7 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
             ? {}
             : {
                 error: httpOk
-                  ? "App is reachable, but Next.js logs show issues."
+                  ? "App is reachable, but logs show issues."
                   : `App returned HTTP ${info.statusCode}. Investigate the issue before reporting completion.`,
               }),
         };
@@ -500,7 +441,7 @@ export const createTools = (vm: Vm, options?: CreateToolsOptions) => {
 
   const devServerLogsTool = tool({
     description:
-      "Fetch recent dev server logs (Next.js). Use this to debug build/runtime issues.",
+      "Fetch recent dev server logs. Use this to debug build/runtime issues.",
     inputSchema: z
       .object({
         maxLines: z

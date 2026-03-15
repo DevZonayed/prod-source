@@ -12,6 +12,7 @@ import {
 import { useChat } from "@ai-sdk/react";
 import { type UIMessage } from "ai";
 import { Thread } from "@/components/assistant-ui/thread";
+import { DirectoryPicker } from "@/components/assistant-ui/directory-picker";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
@@ -64,6 +65,12 @@ export const Assistant = ({
   );
   const activeRepoIdRef = useRef<string | null>(selectedRepoId);
   const activeConversationIdRef = useRef<string | null>(selectedConversationId);
+  const [showDirectoryPicker, setShowDirectoryPicker] = useState(false);
+  const [pendingProjectName, setPendingProjectName] = useState("");
+  const pendingResolveRef = useRef<
+    ((result: { mode: string; customDir?: string; githubRepoName?: string } | null) => void) | null
+  >(null);
+
   const onActiveConversationChangeRef = useRef(onActiveConversationChange);
   const chatSessionIdRef = useRef(
     selectedConversationId
@@ -253,21 +260,40 @@ export const Assistant = ({
         };
       }
 
+      // Show directory picker and wait for user choice
+      setPendingProjectName(requestedRepoName || "New Project");
+      setShowDirectoryPicker(true);
+
+      const pickerResult = await new Promise<{
+        mode: string;
+        customDir?: string;
+        githubRepoName?: string;
+      } | null>((resolve) => {
+        pendingResolveRef.current = resolve;
+      });
+
+      setShowDirectoryPicker(false);
+      pendingResolveRef.current = null;
+
+      if (!pickerResult) {
+        throw new Error("Project creation cancelled.");
+      }
+
+      const repoPayload: Record<string, string | undefined> = {};
+      if (requestedRepoName) repoPayload.name = requestedRepoName;
+      if (requestedConversationTitle)
+        repoPayload.conversationTitle = requestedConversationTitle;
+      if (pickerResult.customDir)
+        repoPayload.customDir = pickerResult.customDir;
+      if (pickerResult.githubRepoName)
+        repoPayload.githubRepoName = pickerResult.githubRepoName;
+
       const response = await fetch("/api/repos", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(
-          requestedRepoName || requestedConversationTitle
-            ? {
-                ...(requestedRepoName ? { name: requestedRepoName } : {}),
-                ...(requestedConversationTitle
-                  ? { conversationTitle: requestedConversationTitle }
-                  : {}),
-              }
-            : {},
-        ),
+        body: JSON.stringify(repoPayload),
       });
       if (!response.ok) {
         throw new Error("Failed to create a repository for this chat.");
@@ -380,11 +406,29 @@ export const Assistant = ({
 
   const runtime = useAISDKRuntime(chat);
 
+  const handlePickerConfirm = useCallback(
+    (result: { mode: string; customDir?: string; githubRepoName?: string }) => {
+      pendingResolveRef.current?.(result);
+    },
+    [],
+  );
+
+  const handlePickerCancel = useCallback(() => {
+    pendingResolveRef.current?.(null);
+  }, []);
+
   return (
     <AssistantRuntimeProvider key={runtimeKey} runtime={runtime}>
       <ThreadStateBridge onThreadStateChange={handleThreadStateChange} />
       <AutoPromptBridge />
       <Thread welcome={welcome} />
+      {showDirectoryPicker && (
+        <DirectoryPicker
+          projectName={pendingProjectName}
+          onConfirm={handlePickerConfirm}
+          onCancel={handlePickerCancel}
+        />
+      )}
     </AssistantRuntimeProvider>
   );
 };

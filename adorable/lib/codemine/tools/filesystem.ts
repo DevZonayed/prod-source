@@ -1,7 +1,7 @@
 import { tool } from "ai";
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import { z } from "zod";
-import { WORKDIR } from "../../vars";
+
 import { MAX_VIEW_FILE_LINES } from "../constants";
 import {
   resolveAbsPath,
@@ -40,7 +40,7 @@ export function createFilesystemTools(vm: Vm, trackFile: (path: string) => void)
       execute: async ({ AbsolutePath, StartLine, EndLine }) => {
         const absPath = resolveAbsPath(AbsolutePath);
         if (!absPath)
-          return { error: `Invalid path: ${AbsolutePath}. Must be within ${WORKDIR}.` };
+          return { error: `Invalid path: ${AbsolutePath}. Must be within the workspace.` };
 
         const content = await readVmFile(vm, absPath);
         if (content === null) return { error: `File not found: ${absPath}` };
@@ -80,7 +80,7 @@ export function createFilesystemTools(vm: Vm, trackFile: (path: string) => void)
       execute: async ({ AbsolutePath, OldString, NewString }) => {
         const absPath = resolveAbsPath(AbsolutePath);
         if (!absPath)
-          return { error: `Invalid path: ${AbsolutePath}. Must be within ${WORKDIR}.` };
+          return { error: `Invalid path: ${AbsolutePath}. Must be within the workspace.` };
 
         const content = await readVmFile(vm, absPath);
         if (content === null) return { error: `File not found: ${absPath}` };
@@ -125,7 +125,7 @@ export function createFilesystemTools(vm: Vm, trackFile: (path: string) => void)
       execute: async ({ AbsolutePath, Content }) => {
         const absPath = resolveAbsPath(AbsolutePath);
         if (!absPath)
-          return { error: `Invalid path: ${AbsolutePath}. Must be within ${WORKDIR}.` };
+          return { error: `Invalid path: ${AbsolutePath}. Must be within the workspace.` };
 
         // Check if file already exists
         const existing = await readVmFile(vm, absPath);
@@ -159,7 +159,7 @@ export function createFilesystemTools(vm: Vm, trackFile: (path: string) => void)
       execute: async ({ AbsolutePath }) => {
         const absPath = resolveAbsPath(AbsolutePath);
         if (!absPath)
-          return { error: `Invalid path: ${AbsolutePath}. Must be within ${WORKDIR}.` };
+          return { error: `Invalid path: ${AbsolutePath}. Must be within the workspace.` };
 
         const result = await runVmCommand(
           vm,
@@ -185,7 +185,7 @@ export function createFilesystemTools(vm: Vm, trackFile: (path: string) => void)
         const absPath = resolveAbsPath(DirectoryPath);
         if (!absPath)
           return {
-            error: `Invalid path: ${DirectoryPath}. Must be within ${WORKDIR}.`,
+            error: `Invalid path: ${DirectoryPath}. Must be within the workspace.`,
           };
 
         const result = await runVmCommand(

@@ -5,7 +5,7 @@
 
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import type { BuildForgeContext } from "../../types";
 import { writeVmFile } from "../base";
 import { updateMemorySection, writeMemoryFile } from "../../memory/level2-project";

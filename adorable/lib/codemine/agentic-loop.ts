@@ -5,9 +5,9 @@ import {
   type ToolSet,
   convertToModelMessages,
 } from "ai";
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import { LoopDetector } from "./loop-detector";
-import { buildInitialEphemeral } from "./ephemeral";
+import { buildInitialEphemeral, buildStepEphemeral } from "./ephemeral";
 import type {
   AgenticLoopConfig,
   AgenticLoopState,
@@ -83,31 +83,32 @@ export async function runAgenticLoop(
   // Convert initial messages
   const modelMessages = await convertToModelMessages(params.messages);
 
-  // Build initial ephemeral context and inject as system message
-  const sandboxState = await captureSandboxState(params.vm, params.previewUrl);
-  const initialEphemeral = buildInitialEphemeral({
-    stepId: 0,
-    sandboxState,
-    diagnostics: sandboxState.devServerErrors,
-    kiSummaries: [],
-    warnings: [],
-  });
-
-  // Merge ephemeral context into the system prompt to avoid multiple system messages
-  // (Anthropic doesn't support system messages separated by user/assistant messages)
-  const systemWithEphemeral = params.system + "\n\n" + initialEphemeral;
-
   // AbortController for loop detector force-stops
   const abortController = new AbortController();
   let currentStep = 0;
 
   const result = streamText({
-    system: systemWithEphemeral,
+    system: params.system,
     model,
     messages: modelMessages,
     tools: params.tools,
     stopWhen: stepCountIs(config.hardLimit),
     abortSignal: abortController.signal,
+    // Per-step ephemeral injection: rebuilds the system prompt with fresh context each step
+    prepareStep: async ({ stepNumber }) => {
+      const sandboxState = await captureSandboxState(params.vm, params.previewUrl);
+      const ctx = {
+        stepId: stepNumber,
+        sandboxState,
+        diagnostics: sandboxState.devServerErrors,
+        kiSummaries: [],
+        warnings: loopDetector.getWarnings(),
+      };
+      const ephemeral = stepNumber === 0
+        ? buildInitialEphemeral(ctx)
+        : buildStepEphemeral(ctx);
+      return { system: params.system + "\n\n" + ephemeral };
+    },
     onStepFinish: async (step) => {
       currentStep++;
       state.stepCount = currentStep;
@@ -153,6 +154,15 @@ export async function runAgenticLoop(
           abortController.abort();
           return;
         }
+      }
+
+      // Check if notify_user requested a pause (BlockedOnUser)
+      if (state.pauseForUser) {
+        console.log(
+          `[CodeMine] Pausing for user at step ${currentStep} (BlockedOnUser)`,
+        );
+        abortController.abort();
+        return;
       }
 
       // Check total task timeout

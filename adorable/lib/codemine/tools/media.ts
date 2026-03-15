@@ -1,8 +1,8 @@
 import { tool } from "ai";
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import { z } from "zod";
 import { resolveAbsPath, ensureDir, runVmCommand, shellQuote } from "./helpers";
-import { WORKDIR } from "../../vars";
+
 
 /**
  * Creates the generate_image tool using OpenAI DALL-E API.
@@ -44,7 +44,7 @@ export function createMediaTools(vm: Vm) {
         const absPath = resolveAbsPath(OutputPath);
         if (!absPath)
           return {
-            error: `Invalid path: ${OutputPath}. Must be within ${WORKDIR}.`,
+            error: `Invalid path: ${OutputPath}. Must be within the workspace.`,
           };
 
         // Determine size (DALL-E supports specific sizes)

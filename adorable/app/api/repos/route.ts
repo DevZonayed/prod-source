@@ -1,108 +1,35 @@
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
-import { freestyle } from "freestyle-sandboxes";
-import { TEMPLATE_REPO } from "@/lib/vars";
-import { createVmForRepo, voxelVmSpec } from "@/lib/voxel-vm";
 import { getOrCreateIdentitySession } from "@/lib/identity-session";
-import { upgradeNextjs } from "@/lib/upgrade-dependencies";
 import {
-  VOXEL_WRAPPER_REPO_PREFIX,
-  type RepoMetadata,
-  type RepoDeploymentSummary,
+  createProject,
+  listProjects,
+  getGitHubToken,
+} from "@/lib/local-storage";
+import {
   createConversationInRepo,
   readRepoMetadata,
-  writeRepoMetadata,
+  type RepoMetadata,
 } from "@/lib/repo-storage";
-
-const toDisplayRepoName = (name?: string | null) => {
-  if (!name) return undefined;
-  return name.startsWith(VOXEL_WRAPPER_REPO_PREFIX)
-    ? name.slice(VOXEL_WRAPPER_REPO_PREFIX.length)
-    : name;
-};
-
-type DeploymentEntry = {
-  deploymentId: string;
-  state: "building" | "deployed" | "failed";
-  domains: string[];
-};
-
-const reconcileDeploymentState = (
-  deployment: RepoDeploymentSummary,
-  entries: DeploymentEntry[],
-): RepoDeploymentSummary => {
-  const matchById = deployment.deploymentId
-    ? entries.find((entry) => entry.deploymentId === deployment.deploymentId)
-    : undefined;
-
-  const matchByDomain = entries.find((entry) =>
-    entry.domains.includes(deployment.domain),
-  );
-
-  const match = matchById ?? matchByDomain;
-  if (!match) {
-    return {
-      ...deployment,
-      state: deployment.state === "deploying" ? "idle" : deployment.state,
-    };
-  }
-
-  const state: RepoDeploymentSummary["state"] =
-    match.state === "deployed"
-      ? "live"
-      : match.state === "failed"
-        ? "failed"
-        : "deploying";
-
-  return {
-    ...deployment,
-    deploymentId: match.deploymentId ?? deployment.deploymentId,
-    state,
-  };
-};
-
-const toRepoResponse = async (
-  repo: { id: string; name?: string | null },
-  deploymentEntries: DeploymentEntry[],
-) => {
-  const metadata = await readRepoMetadata(repo.id);
-  const repoDisplayName = toDisplayRepoName(repo.name);
-  const metadataDisplayName = toDisplayRepoName(metadata?.name);
-  const reconciledMetadata = metadata
-    ? {
-        ...metadata,
-        deployments: metadata.deployments.map((deployment) =>
-          reconcileDeploymentState(deployment, deploymentEntries),
-        ),
-      }
-    : metadata;
-
-  return {
-    id: repo.id,
-    name: repoDisplayName ?? metadataDisplayName ?? "Untitled Repo",
-    metadata: reconciledMetadata,
-  };
-};
+import { getProjectDir, PROJECTS_DIR, HOST_PROJECTS_DIR, APP_PORT } from "@/lib/vars";
+import { getTemplate, getDevCommand } from "@/lib/templates";
+import { execSync } from "child_process";
+import * as fs from "fs";
+import * as path from "path";
 
 export async function GET() {
-  const { identityId, identity } = await getOrCreateIdentitySession();
-  const { repositories } = await identity.permissions.git.list({ limit: 200 });
-  const wrapperRepositories = repositories.filter((repo) =>
-    (repo.name ?? "").startsWith(VOXEL_WRAPPER_REPO_PREFIX),
-  );
-
-  let deploymentEntries: DeploymentEntry[] = [];
-  try {
-    const { entries } = await freestyle.serverless.deployments.list({
-      limit: 500,
-    });
-    deploymentEntries = entries as DeploymentEntry[];
-  } catch {
-    deploymentEntries = [];
-  }
+  const { identityId } = await getOrCreateIdentitySession();
+  const projects = listProjects();
 
   const items = await Promise.all(
-    wrapperRepositories.map((repo) => toRepoResponse(repo, deploymentEntries)),
+    projects.map(async (project) => {
+      const metadata = await readRepoMetadata(project.id);
+      return {
+        id: project.id,
+        name: project.name,
+        metadata,
+      };
+    }),
   );
 
   return NextResponse.json({
@@ -112,107 +39,198 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const { identity } = await getOrCreateIdentitySession();
-
   let requestedName: string | undefined;
   let requestedConversationTitle: string | undefined;
   let githubRepoName: string | undefined;
+  let framework: string = "nextjs";
+  let existingPath: string | undefined;
+  let githubTokenId: string | undefined;
+
   try {
     const payload = (await req.json()) as {
       name?: string;
       conversationTitle?: string;
       githubRepoName?: string;
+      framework?: string;
+      existingPath?: string;
+      customDir?: string;
+      githubTokenId?: string;
     };
-    const nextName = payload?.name?.trim();
-    const nextConversationTitle = payload?.conversationTitle?.trim();
-    const nextGithubRepoName = payload?.githubRepoName?.trim();
-    requestedName = nextName ? nextName : undefined;
-    requestedConversationTitle = nextConversationTitle
-      ? nextConversationTitle
-      : undefined;
-    githubRepoName = nextGithubRepoName ? nextGithubRepoName : undefined;
+    requestedName = payload?.name?.trim() || undefined;
+    requestedConversationTitle = payload?.conversationTitle?.trim() || undefined;
+    githubRepoName = payload?.githubRepoName?.trim() || undefined;
+    framework = payload?.framework?.trim() || "nextjs";
+    existingPath = payload?.existingPath?.trim() || payload?.customDir?.trim() || undefined;
+    githubTokenId = payload?.githubTokenId?.trim() || undefined;
   } catch {
-    requestedName = undefined;
-    requestedConversationTitle = undefined;
-    githubRepoName = undefined;
+    // Defaults
   }
 
-  // Create repo with GitHub Sync or from template
-  let sourceRepoId: string;
-  if (githubRepoName) {
-    const { repo, repoId: createdRepoId } = await freestyle.git.repos.create(
-      requestedName ? { name: requestedName } : {},
-    );
-    sourceRepoId = createdRepoId;
+  const projectId = randomUUID();
+  let projectPath: string;
+  let projectSource: "new" | "existing" | "github" = "new";
+  let githubUrl: string | undefined;
 
-    // Enable GitHub Sync
-    await repo.githubSync.enable({ githubRepoName });
+  if (existingPath) {
+    // ─── Existing directory mode ───
+    // The path should be under /host-projects (mounted from host)
+    projectPath = existingPath.startsWith("/")
+      ? existingPath
+      : path.join(HOST_PROJECTS_DIR, existingPath);
+
+    if (!fs.existsSync(projectPath)) {
+      return NextResponse.json(
+        { error: `Directory not found: ${existingPath}` },
+        { status: 400 },
+      );
+    }
+
+    projectSource = "existing";
+
+    // Initialize git if not already a repo
+    if (!fs.existsSync(path.join(projectPath, ".git"))) {
+      try {
+        execSync("git init", { cwd: projectPath, stdio: "pipe" });
+        execSync("git add -A && git commit -m 'Initial commit' --allow-empty", {
+          cwd: projectPath,
+          stdio: "pipe",
+        });
+      } catch {
+        // Non-fatal
+      }
+    }
+  } else if (githubRepoName) {
+    // ─── GitHub import mode ───
+    projectPath = getProjectDir(projectId);
+    projectSource = "github";
+    githubUrl = githubRepoName.includes("://")
+      ? githubRepoName
+      : `https://github.com/${githubRepoName}`;
+
+    fs.mkdirSync(projectPath, { recursive: true });
+
+    // Get token if provided
+    let cloneUrl = githubUrl;
+    if (githubTokenId) {
+      const tokenRecord = getGitHubToken(githubTokenId);
+      if (tokenRecord) {
+        cloneUrl = githubUrl.replace(
+          "https://",
+          `https://${tokenRecord.token}@`,
+        );
+      }
+    }
+
+    try {
+      execSync(`git clone ${cloneUrl} .`, {
+        cwd: projectPath,
+        stdio: "pipe",
+        timeout: 120_000,
+      });
+    } catch (e) {
+      return NextResponse.json(
+        { error: `Failed to clone: ${e instanceof Error ? e.message : "Unknown error"}` },
+        { status: 500 },
+      );
+    }
   } else {
-    // Create from template
-    const created = await freestyle.git.repos.create({
-      ...(requestedName ? { name: requestedName } : {}),
-      import: {
-        commitMessage: "Initial commit",
-        url: TEMPLATE_REPO,
-        type: "git",
-      },
-    });
-    sourceRepoId = created.repoId;
+    // ─── New project from template ───
+    projectPath = getProjectDir(projectId);
+    fs.mkdirSync(projectPath, { recursive: true });
+
+    const template = getTemplate(framework);
+
+    if (template && template.templateRepo) {
+      try {
+        execSync(`git clone ${template.templateRepo} .`, {
+          cwd: projectPath,
+          stdio: "pipe",
+          timeout: 120_000,
+        });
+        // Remove .git and reinitialize for fresh history
+        fs.rmSync(path.join(projectPath, ".git"), { recursive: true, force: true });
+        execSync("git init && git add -A && git commit -m 'Initial commit'", {
+          cwd: projectPath,
+          stdio: "pipe",
+        });
+      } catch (e) {
+        return NextResponse.json(
+          { error: `Failed to set up template: ${e instanceof Error ? e.message : "Unknown error"}` },
+          { status: 500 },
+        );
+      }
+    } else if (framework === "react") {
+      // Scaffold React+Vite project
+      try {
+        execSync(
+          `npm create vite@latest . -- --template react-ts`,
+          { cwd: projectPath, stdio: "pipe", timeout: 120_000 },
+        );
+        execSync("git init && git add -A && git commit -m 'Initial commit'", {
+          cwd: projectPath,
+          stdio: "pipe",
+        });
+      } catch (e) {
+        return NextResponse.json(
+          { error: `Failed to scaffold React project: ${e instanceof Error ? e.message : "Unknown error"}` },
+          { status: 500 },
+        );
+      }
+    }
   }
+
+  // Derive name and dev command (no container or port allocation here —
+  // containers are created on-the-fly when the user visits the project page)
+  const devCommand = getDevCommand(framework, 3000);
 
   const inferredName =
-    requestedName ?? githubRepoName?.split("/").pop()?.trim() ?? "Project";
-  const wrapperRepoName = `${VOXEL_WRAPPER_REPO_PREFIX}${inferredName}`;
-  const wrapperCreated = await freestyle.git.repos.create({
-    name: wrapperRepoName,
-  });
-  const wrapperRepoId = wrapperCreated.repoId;
+    requestedName ??
+    githubRepoName?.split("/").pop()?.trim() ??
+    (existingPath ? path.basename(existingPath) : "Project");
 
-  await identity.permissions.git.grant({
-    permission: "write",
-    repoId: sourceRepoId,
-  });
-
-  await identity.permissions.git.grant({
-    permission: "write",
-    repoId: wrapperRepoId,
-  });
-
-  const vm = await createVmForRepo(sourceRepoId);
-
-  await identity.permissions.vms.grant({
-    vmId: vm.vmId,
+  // Create project record (no container yet — useContainer hook handles that)
+  const project = createProject({
+    id: projectId,
+    name: inferredName,
+    path: projectPath,
+    hostPath: existingPath || undefined,
+    source: projectSource,
+    framework,
+    devCommand,
+    githubUrl,
+    githubTokenId,
   });
 
-  // Upgrade Next.js to latest version in background (don't block repo creation)
-  const vmRef = freestyle.vms.ref({ vmId: vm.vmId, spec: voxelVmSpec });
-  void upgradeNextjs(vmRef).catch((err) => {
-    console.error("Next.js auto-upgrade failed:", err);
-  });
+  // Placeholder VM info — actual preview URL is set when container starts
+  const vmPlaceholder = {
+    vmId: projectId,
+    previewUrl: `http://localhost:${APP_PORT}`,
+    devCommandTerminalUrl: `ws://localhost:${APP_PORT}/ws/terminal?projectId=${projectId}`,
+    additionalTerminalsUrl: `ws://localhost:${APP_PORT}/ws/terminal?projectId=${projectId}&session=additional`,
+  };
 
+  // Create initial metadata and conversation
   const initialMetadata: RepoMetadata = {
     version: 2,
-    sourceRepoId,
-    ...(requestedName ? { name: requestedName } : {}),
-    vm,
+    sourceRepoId: projectId,
+    name: inferredName,
+    vm: vmPlaceholder,
     conversations: [],
     deployments: [],
     productionDomain: null,
     productionDeploymentId: null,
   };
 
-  await writeRepoMetadata(wrapperRepoId, initialMetadata);
-
   const conversationId = randomUUID();
   const metadata = await createConversationInRepo(
-    wrapperRepoId,
+    projectId,
     initialMetadata,
     conversationId,
     requestedConversationTitle,
   );
 
   return NextResponse.json({
-    id: wrapperRepoId,
+    id: projectId,
     metadata,
     conversationId,
   });

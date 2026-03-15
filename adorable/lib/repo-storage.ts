@@ -1,9 +1,16 @@
 import { type UIMessage } from "ai";
-import { freestyle } from "freestyle-sandboxes";
+import {
+  getProject,
+  listProjects,
+  listConversations,
+  getConversation,
+  createConversation as dbCreateConversation,
+  saveConversationMessages as dbSaveMessages,
+  updateProject,
+  type ProjectRecord,
+} from "@/lib/local-storage";
 
-export const VOXEL_METADATA_PATH = "metadata.json";
-export const VOXEL_CONVERSATIONS_DIR = "conversations";
-export const VOXEL_WRAPPER_REPO_PREFIX = "voxel-meta - ";
+// ─── Types (preserved for backward compat with frontend) ───
 
 export type RepoVmMetadata = {
   vmId: string;
@@ -40,68 +47,58 @@ export type RepoMetadata = {
   productionDeploymentId: string | null;
 };
 
-type StoredRepoMetadata = {
-  version: 2;
-  sourceRepoId: string;
-  name?: string;
-  vm: RepoVmMetadata;
-  conversations: RepoConversationSummary[];
-  deployments: RepoDeploymentSummary[];
-  productionDomain: string | null;
-  productionDeploymentId: string | null;
-};
+export const VOXEL_METADATA_PATH = "metadata.json";
+export const VOXEL_CONVERSATIONS_DIR = "conversations";
+export const VOXEL_WRAPPER_REPO_PREFIX = "voxel-meta - ";
 
-const decodeBase64 = (value: string) => {
-  return Buffer.from(value, "base64").toString("utf8");
-};
+// ─── Convert DB record to RepoMetadata ───
 
-const encodeJson = (value: unknown) => {
-  return JSON.stringify(value, null, 2);
-};
+function projectToMetadata(project: ProjectRecord): RepoMetadata {
+  const conversations = listConversations(project.id);
 
-const getDefaultBranch = async (repoId: string) => {
-  const repo = freestyle.git.repos.ref({ repoId });
-  const { defaultBranch } = await repo.branches.getDefaultBranch();
-  return defaultBranch;
-};
-
-const readJsonFile = async <T>(
-  repoId: string,
-  path: string,
-): Promise<T | null> => {
-  const repo = freestyle.git.repos.ref({ repoId });
-  const rev = await getDefaultBranch(repoId);
-
-  try {
-    const entry = await repo.contents.get({ path, rev });
-    if (entry.type !== "file") return null;
-    return JSON.parse(decodeBase64(entry.content)) as T;
-  } catch {
-    return null;
-  }
-};
-
-const writeCommit = async (
-  repoId: string,
-  message: string,
-  files: Array<{ path: string; content: string }>,
-) => {
-  const repo = freestyle.git.repos.ref({ repoId });
-  const branch = await getDefaultBranch(repoId);
-
-  await repo.commits.create({
-    message,
-    branch,
-    files,
-    author: {
-      name: "Voxel",
-      email: "voxel@freestyle.sh",
+  return {
+    version: 2,
+    sourceRepoId: project.id,
+    name: project.name,
+    vm: {
+      vmId: project.id,
+      previewUrl: project.previewUrl || `http://localhost:${project.devPort || 4100}`,
+      devCommandTerminalUrl: `ws://localhost:4000/api/terminal?projectId=${project.id}`,
+      additionalTerminalsUrl: `ws://localhost:4000/api/terminal?projectId=${project.id}&session=additional`,
     },
-  });
+    conversations: conversations.map((c) => ({
+      id: c.id,
+      title: c.title,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+    })),
+    deployments: [],
+    productionDomain: null,
+    productionDeploymentId: null,
+  };
+}
+
+// ─── Public API (same signatures as before) ───
+
+export const readRepoMetadata = async (
+  repoId: string,
+): Promise<RepoMetadata | null> => {
+  const project = getProject(repoId);
+  if (!project) return null;
+  return projectToMetadata(project);
 };
 
-const conversationPath = (conversationId: string) => {
-  return `${VOXEL_CONVERSATIONS_DIR}/${conversationId}.json`;
+export const resolveSourceRepoId = async (repoId: string) => {
+  return repoId;
+};
+
+export const writeRepoMetadata = async (
+  repoId: string,
+  metadata: RepoMetadata,
+) => {
+  if (metadata.name) {
+    updateProject(repoId, { name: metadata.name });
+  }
 };
 
 const deriveConversationTitle = (
@@ -120,209 +117,82 @@ const deriveConversationTitle = (
   return clean.slice(0, 60);
 };
 
-export const readRepoMetadata = async (
-  repoId: string,
-): Promise<RepoMetadata | null> => {
-  const metadata = await readJsonFile<StoredRepoMetadata>(
-    repoId,
-    VOXEL_METADATA_PATH,
-  );
-  if (!metadata) return null;
-  if (!metadata.sourceRepoId) return null;
-
-  return {
-    version: metadata.version,
-    sourceRepoId: metadata.sourceRepoId,
-    name: metadata.name,
-    vm: metadata.vm,
-    conversations: metadata.conversations,
-    deployments: metadata.deployments,
-    productionDomain: metadata.productionDomain,
-    productionDeploymentId: metadata.productionDeploymentId,
-  };
-};
-
-export const resolveSourceRepoId = async (repoId: string) => {
-  const metadata = await readRepoMetadata(repoId);
-  return metadata?.sourceRepoId ?? repoId;
-};
-
-export const writeRepoMetadata = async (
-  repoId: string,
-  metadata: RepoMetadata,
-) => {
-  await writeCommit(repoId, "Update voxel metadata", [
-    { path: VOXEL_METADATA_PATH, content: encodeJson(metadata) },
-  ]);
-};
-
 export const createConversationInRepo = async (
   repoId: string,
   metadata: RepoMetadata,
   conversationId: string,
   initialTitle?: string,
 ) => {
-  const latestMetadata = (await readRepoMetadata(repoId)) ?? metadata;
-  const now = new Date().toISOString();
-  const normalizedInitialTitle = initialTitle?.trim().replace(/\s+/g, " ");
+  const normalizedTitle = initialTitle?.trim().replace(/\s+/g, " ");
   const fallbackTitle =
-    normalizedInitialTitle && normalizedInitialTitle.length > 0
-      ? normalizedInitialTitle.slice(0, 60)
-      : `Conversation ${latestMetadata.conversations.length + 1}`;
+    normalizedTitle && normalizedTitle.length > 0
+      ? normalizedTitle.slice(0, 60)
+      : `Conversation ${metadata.conversations.length + 1}`;
 
-  const nextMetadata: RepoMetadata = {
-    ...metadata,
-    ...latestMetadata,
-    sourceRepoId: latestMetadata.sourceRepoId,
-    conversations: [
-      {
-        id: conversationId,
-        title: fallbackTitle,
-        createdAt: now,
-        updatedAt: now,
-      },
-      ...latestMetadata.conversations,
-    ],
-  };
+  dbCreateConversation({
+    id: conversationId,
+    projectId: repoId,
+    title: fallbackTitle,
+  });
 
-  await writeCommit(repoId, "Create conversation", [
-    {
-      path: VOXEL_METADATA_PATH,
-      content: encodeJson(nextMetadata),
-    },
-    {
-      path: conversationPath(conversationId),
-      content: encodeJson([]),
-    },
-  ]);
-
-  return nextMetadata;
+  return readRepoMetadata(repoId) as Promise<RepoMetadata>;
 };
 
 export const readConversationMessages = async (
-  repoId: string,
+  _repoId: string,
   conversationId: string,
 ): Promise<UIMessage[]> => {
-  return (
-    (await readJsonFile<UIMessage[]>(
-      repoId,
-      conversationPath(conversationId),
-    )) ?? []
-  );
+  const conv = getConversation(conversationId);
+  return conv?.messages ?? [];
 };
 
 export const saveConversationMessages = async (
   repoId: string,
-  metadata: RepoMetadata,
+  _metadata: RepoMetadata,
   conversationId: string,
   messages: UIMessage[],
 ) => {
-  const latestMetadata = (await readRepoMetadata(repoId)) ?? metadata;
-  const now = new Date().toISOString();
-
-  const existing = latestMetadata.conversations.find(
-    (c) => c.id === conversationId,
-  );
-  const fallbackTitle =
-    existing?.title ??
-    `Conversation ${latestMetadata.conversations.length + 1}`;
+  const conv = getConversation(conversationId);
+  const fallbackTitle = conv?.title ?? `Conversation`;
   const title = deriveConversationTitle(messages, fallbackTitle);
 
-  const updatedConversation: RepoConversationSummary = {
-    id: conversationId,
-    title,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-  };
+  // Create conversation if it doesn't exist yet
+  if (!conv) {
+    dbCreateConversation({
+      id: conversationId,
+      projectId: repoId,
+      title,
+      messages,
+    });
+  } else {
+    dbSaveMessages(conversationId, messages, title);
+  }
 
-  const nextConversations = [
-    updatedConversation,
-    ...latestMetadata.conversations.filter((c) => c.id !== conversationId),
-  ];
-
-  const nextMetadata: RepoMetadata = {
-    ...latestMetadata,
-    conversations: nextConversations,
-  };
-
-  await writeCommit(repoId, "Update conversation", [
-    {
-      path: VOXEL_METADATA_PATH,
-      content: encodeJson(nextMetadata),
-    },
-    {
-      path: conversationPath(conversationId),
-      content: encodeJson(messages),
-    },
-  ]);
-
-  return nextMetadata;
+  return readRepoMetadata(repoId);
 };
 
+// ─── Deployment stubs (no-ops in local mode) ───
+
 export const addRepoDeployment = async (
-  repoId: string,
+  _repoId: string,
   metadata: RepoMetadata,
-  deployment: RepoDeploymentSummary,
+  _deployment: RepoDeploymentSummary,
 ) => {
-  const latestMetadata = (await readRepoMetadata(repoId)) ?? metadata;
-  const nextMetadata: RepoMetadata = {
-    ...latestMetadata,
-    deployments: [
-      deployment,
-      ...latestMetadata.deployments.filter(
-        (d) => d.commitSha !== deployment.commitSha,
-      ),
-    ],
-  };
-
-  await writeCommit(repoId, "Record deployment", [
-    {
-      path: VOXEL_METADATA_PATH,
-      content: encodeJson(nextMetadata),
-    },
-  ]);
-
-  return nextMetadata;
+  return metadata;
 };
 
 export const setRepoProductionDomain = async (
-  repoId: string,
+  _repoId: string,
   metadata: RepoMetadata,
-  productionDomain: string,
+  _productionDomain: string,
 ) => {
-  const latestMetadata = (await readRepoMetadata(repoId)) ?? metadata;
-  const nextMetadata: RepoMetadata = {
-    ...latestMetadata,
-    productionDomain,
-  };
-
-  await writeCommit(repoId, "Configure production domain", [
-    {
-      path: VOXEL_METADATA_PATH,
-      content: encodeJson(nextMetadata),
-    },
-  ]);
-
-  return nextMetadata;
+  return metadata;
 };
 
 export const promoteRepoDeploymentToProduction = async (
-  repoId: string,
+  _repoId: string,
   metadata: RepoMetadata,
-  productionDeploymentId: string,
+  _productionDeploymentId: string,
 ) => {
-  const latestMetadata = (await readRepoMetadata(repoId)) ?? metadata;
-  const nextMetadata: RepoMetadata = {
-    ...latestMetadata,
-    productionDeploymentId,
-  };
-
-  await writeCommit(repoId, "Promote deployment to production", [
-    {
-      path: VOXEL_METADATA_PATH,
-      content: encodeJson(nextMetadata),
-    },
-  ]);
-
-  return nextMetadata;
+  return metadata;
 };

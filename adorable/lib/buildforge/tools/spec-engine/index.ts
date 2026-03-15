@@ -6,7 +6,7 @@
 
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import type { BuildForgeContext, Entity, Screen, ApiEndpoint, Role, BusinessRule, AppSpec } from "../../types";
 import { matchProjectPattern, getPatternDefaults } from "../../spec/pattern-matcher";
 import { parseSpecFromEntities, mergeWithPattern } from "../../spec/parser";

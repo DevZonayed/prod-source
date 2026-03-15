@@ -38,7 +38,7 @@ export const groupConsecutiveToolCalls: GroupingFunction = (parts) => {
   let currentToolIndices: number[] | null = null;
   let currentToolInfos: ToolInfo[] | null = null;
 
-  // Tools that should never be grouped (both legacy and CodeMine names)
+  // Tools that should never be grouped (legacy, CodeMine, and Claude SDK names)
   const UNGROUPED_TOOLS = new Set([
     "commitTool",
     "checkAppTool",
@@ -46,6 +46,7 @@ export const groupConsecutiveToolCalls: GroupingFunction = (parts) => {
     "task_boundary",
     "notify_user",
     "git_commit",
+    "check_app",
     "browser_action",
   ]);
 
@@ -108,20 +109,25 @@ const summarize = (tools: ToolInfo[]): string => {
 
   for (const t of tools) {
     const file = typeof t.args.file === "string" ? t.args.file :
-      typeof t.args.AbsolutePath === "string" ? t.args.AbsolutePath : undefined;
+      typeof t.args.AbsolutePath === "string" ? t.args.AbsolutePath :
+      typeof t.args.file_path === "string" ? t.args.file_path : undefined;
     switch (t.toolName) {
       case "readFileTool":
       case "view_file":
+      case "Read":
+      case "TodoRead":
         reads++;
         break;
       case "writeFileTool":
       case "create_file":
+      case "Write":
         writes++;
         singleFile ??= file;
         break;
       case "replaceInFileTool":
       case "appendToFileTool":
       case "edit_file":
+      case "Edit":
         edits++;
         singleFile ??= file;
         break;
@@ -129,14 +135,20 @@ const summarize = (tools: ToolInfo[]): string => {
       case "grep_search":
       case "codebase_search":
       case "find_by_name":
+      case "Grep":
+      case "ToolSearch":
         searches++;
         break;
       case "listFilesTool":
       case "list_dir":
+      case "Glob":
+      case "LS":
         reads++;
         break;
       case "bashTool":
       case "run_command":
+      case "Bash":
+      case "TodoWrite":
         cmds++;
         break;
       default:
