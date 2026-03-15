@@ -6,8 +6,8 @@ import { getOrCreateIdentitySession } from "@/lib/identity-session";
 import { readRepoMetadata, saveConversationMessages } from "@/lib/repo-storage";
 import { getClaudeAccessToken } from "@/lib/claude-auth";
 
-// ─── Claude CLI provider (OAuth requires CLI binary) ───
-import { createClaudeCliStreamResponse } from "@/lib/claude-cli-provider";
+// ─── Claude Agent SDK provider (OAuth via CLI binary + VM-scoped MCP tools) ───
+import { createClaudeSdkStreamResponse } from "@/lib/claude-sdk-provider";
 
 // ─── CodeMine (new agentic engine) ───
 import { createCodeMineTools, runAgenticLoop, buildCodeMinePrompt, CODEMINE_SYSTEM_PROMPT } from "@/lib/codemine";
@@ -131,14 +131,13 @@ export async function POST(req: Request) {
       : "";
 
   // ═══════════════════════════════════════
-  // Claude CLI Mode (OAuth requires CLI binary for attestation)
-  // --system-prompt-file REPLACES the CLI's default identity prompt entirely.
-  // Only YOUR prompt is sent — no "You are Claude Code" baggage.
+  // Claude Agent SDK Mode (OAuth via CLI binary + custom VM-scoped MCP tools)
+  // The CLI handles OAuth attestation; our MCP server handles all tool execution
+  // on the Freestyle VM — no built-in CLI tools (Read/Edit/Bash) are allowed.
   // ═══════════════════════════════════════
   if (llmOptions.providerOverride === "claude-code" && !hasGlobalKey && !userApiKey) {
-    console.log("[Chat] Using Claude CLI binary (OAuth requires CLI attestation)");
+    console.log("[Chat] Using Claude Agent SDK (OAuth + VM-scoped MCP tools)");
 
-    // Build YOUR system prompt (this REPLACES the CLI default via --system-prompt-file)
     let systemPrompt: string;
     try {
       systemPrompt = AGENT_MODE === "codemine"
@@ -148,11 +147,12 @@ export async function POST(req: Request) {
       systemPrompt = AGENT_MODE === "codemine" ? CODEMINE_SYSTEM_PROMPT : SYSTEM_PROMPT;
     }
 
-    return createClaudeCliStreamResponse(messages, {
+    return createClaudeSdkStreamResponse(vm, messages, {
       systemPrompt,
       model: llmOptions.modelOverride ?? "sonnet",
-      conversationId,
       maxTurns: 200,
+      sourceRepoId: metadata.sourceRepoId,
+      metadataRepoId: repoId,
     });
   }
 
