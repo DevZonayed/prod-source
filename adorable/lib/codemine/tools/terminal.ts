@@ -1,7 +1,7 @@
 import { tool } from "ai";
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import { z } from "zod";
-import { WORKDIR } from "../../vars";
+
 import type { AgenticLoopState } from "../types";
 import {
   BACKGROUND_LOG_PREFIX,
@@ -34,11 +34,13 @@ export function createTerminalTools(vm: Vm, state: AgenticLoopState) {
       }),
       execute: async ({ Command, WorkingDirectory, Timeout }) => {
         const cwd = WorkingDirectory
-          ? resolveAbsPath(WorkingDirectory) ?? WORKDIR
-          : WORKDIR;
+          ? resolveAbsPath(WorkingDirectory) ?? "."
+          : ".";
 
-        // Wrap with timeout and cd
-        const wrapped = `cd ${shellQuote(cwd)} && timeout ${Timeout} bash -c ${shellQuote(Command)} 2>&1`;
+        // Wrap with timeout and cd to requested directory
+        const wrapped = cwd === "."
+          ? `timeout ${Timeout} bash -c ${shellQuote(Command)} 2>&1`
+          : `cd ${shellQuote(cwd)} && timeout ${Timeout} bash -c ${shellQuote(Command)} 2>&1`;
         const result = await runVmCommand(vm, wrapped);
 
         return {
@@ -77,14 +79,16 @@ export function createTerminalTools(vm: Vm, state: AgenticLoopState) {
         }
 
         const cwd = WorkingDirectory
-          ? resolveAbsPath(WorkingDirectory) ?? WORKDIR
-          : WORKDIR;
+          ? resolveAbsPath(WorkingDirectory) ?? "."
+          : ".";
 
         const terminalId = `bg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
         const logFile = `${BACKGROUND_LOG_PREFIX}-${terminalId}.log`;
 
         // Start the process with nohup, redirect output to log file, capture PID
-        const startCmd = `cd ${shellQuote(cwd)} && nohup bash -c ${shellQuote(Command)} > ${shellQuote(logFile)} 2>&1 & echo $!`;
+        const startCmd = cwd === "."
+          ? `nohup bash -c ${shellQuote(Command)} > ${shellQuote(logFile)} 2>&1 & echo $!`
+          : `cd ${shellQuote(cwd)} && nohup bash -c ${shellQuote(Command)} > ${shellQuote(logFile)} 2>&1 & echo $!`;
         const result = await runVmCommand(vm, startCmd);
 
         const pid = parseInt(result.stdout.trim(), 10);

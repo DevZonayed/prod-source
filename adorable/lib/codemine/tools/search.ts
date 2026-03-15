@@ -1,7 +1,7 @@
 import { tool } from "ai";
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import { z } from "zod";
-import { WORKDIR } from "../../vars";
+
 import { MAX_GREP_RESULTS } from "../constants";
 import { resolveAbsPath, runVmCommand, shellQuote } from "./helpers";
 
@@ -35,8 +35,8 @@ export function createSearchTools(vm: Vm) {
         CaseSensitive,
       }) => {
         const searchDir = DirectoryPath
-          ? resolveAbsPath(DirectoryPath) ?? WORKDIR
-          : WORKDIR;
+          ? resolveAbsPath(DirectoryPath) ?? "."
+          : ".";
 
         const flags = ["-rn", "--color=never"];
         if (!CaseSensitive) flags.push("-i");
@@ -77,8 +77,8 @@ export function createSearchTools(vm: Vm) {
       }),
       execute: async ({ Query, DirectoryPath }) => {
         const searchDir = DirectoryPath
-          ? resolveAbsPath(DirectoryPath) ?? WORKDIR
-          : WORKDIR;
+          ? resolveAbsPath(DirectoryPath) ?? "."
+          : ".";
 
         // Split query into meaningful terms (skip short words)
         const terms = Query.toLowerCase()
@@ -151,8 +151,8 @@ export function createSearchTools(vm: Vm) {
       }),
       execute: async ({ SearchPattern, DirectoryPath, Type }) => {
         const searchDir = DirectoryPath
-          ? resolveAbsPath(DirectoryPath) ?? WORKDIR
-          : WORKDIR;
+          ? resolveAbsPath(DirectoryPath) ?? "."
+          : ".";
 
         const typeFlag =
           Type === "file" ? "-type f" : Type === "directory" ? "-type d" : "";

@@ -4,7 +4,7 @@
 // the VM is created from the template repo.
 // =============================================================================
 
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import { WORKDIR, TARGET_NEXTJS_VERSION, TARGET_NESTJS_VERSION } from "./vars";
 
 const shellQuote = (value: string): string =>

@@ -3,7 +3,7 @@
 // Each function builds one of the four context layers.
 // =============================================================================
 
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import type {
   ContextLayer,
   ContextAssemblyRequest,

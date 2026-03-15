@@ -1,4 +1,4 @@
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import { WORKDIR } from "../vars";
 import { KNOWLEDGE_DIR } from "./constants";
 import type { KnowledgeItemMeta } from "./types";

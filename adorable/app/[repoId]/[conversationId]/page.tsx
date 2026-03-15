@@ -1,13 +1,7 @@
 import { Assistant } from "../../assistant";
 import { RepoWelcome } from "@/components/assistant-ui/repo-welcome";
-import { getOrCreateIdentitySession } from "@/lib/identity-session";
 import { readConversationMessages } from "@/lib/repo-storage";
-
-const hasRepoAccess = async (repoId: string) => {
-  const { identity } = await getOrCreateIdentitySession();
-  const { repositories } = await identity.permissions.git.list({ limit: 200 });
-  return repositories.some((repo) => repo.id === repoId);
-};
+import { getProject } from "@/lib/local-storage";
 
 export default async function ConversationPage({
   params,
@@ -16,7 +10,8 @@ export default async function ConversationPage({
 }) {
   const { repoId, conversationId } = await params;
 
-  if (!(await hasRepoAccess(repoId))) {
+  const project = getProject(repoId);
+  if (!project) {
     return (
       <Assistant
         initialMessages={[]}

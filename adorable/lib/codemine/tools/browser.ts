@@ -1,7 +1,7 @@
 import { tool, type Tool } from "ai";
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import { z } from "zod";
-import { WORKDIR, VM_PORT } from "../../vars";
+import { VM_PORT } from "../../vars";
 import { runVmCommand, shellQuote } from "./helpers";
 
 /**
@@ -227,7 +227,7 @@ export function createBrowserTools(vm: Vm, previewUrl: string) {
               return {
                 action: "screenshot",
                 result: await callPlaywright("browser_screenshot", {}),
-                savedTo: `${WORKDIR}/public/screenshots/screenshot-${Date.now()}.png`,
+                savedTo: `./public/screenshots/screenshot-${Date.now()}.png`,
               };
             case "scroll_up":
               return {

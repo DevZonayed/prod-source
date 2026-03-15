@@ -1,9 +1,8 @@
 import { type UIMessage } from "ai";
 import { cookies } from "next/headers";
-import { freestyle } from "freestyle-sandboxes";
-import { voxelVmSpec } from "@/lib/voxel-vm";
-import { getOrCreateIdentitySession } from "@/lib/identity-session";
+import { getVmRef } from "@/lib/voxel-vm";
 import { readRepoMetadata, saveConversationMessages } from "@/lib/repo-storage";
+import { getProject } from "@/lib/local-storage";
 import { getClaudeAccessToken } from "@/lib/claude-auth";
 
 // ─── Claude Agent SDK provider (OAuth via CLI binary + VM-scoped MCP tools) ───
@@ -46,13 +45,13 @@ export async function POST(req: Request) {
     );
   }
 
-  // ─── Auth & Access ───
-  const { identity } = await getOrCreateIdentitySession();
-  const { repositories } = await identity.permissions.git.list({ limit: 200 });
-  const hasAccess = repositories.some((repo) => repo.id === repoId);
-
-  if (!hasAccess) {
-    return Response.json({ error: "Forbidden" }, { status: 403 });
+  // ─── Load project ───
+  const project = getProject(repoId);
+  if (!project) {
+    return Response.json(
+      { error: "Project not found." },
+      { status: 404 },
+    );
   }
 
   const metadata = await readRepoMetadata(repoId);
@@ -65,12 +64,10 @@ export async function POST(req: Request) {
 
   await saveConversationMessages(repoId, metadata, conversationId, messages);
 
-  const vm = freestyle.vms.ref({
-    vmId: metadata.vm.vmId,
-    spec: voxelVmSpec,
-  });
+  // ─── Get local VM ───
+  const vm = getVmRef(repoId, project.path);
 
-  // ─── LLM Auth (shared by both modes) ───
+  // ─── LLM Auth ───
   const jar = await cookies();
   const userApiKey = jar.get("user-api-key")?.value;
   const userProvider = jar.get("user-api-provider")?.value;
@@ -90,14 +87,12 @@ export async function POST(req: Request) {
     return Response.json(
       {
         error:
-          "No API key configured. Please sign in with Claude or add your API key in settings.",
+          "No API key configured. Please add your API key in settings.",
       },
       { status: 401 },
     );
   }
 
-  // For claude-code: no apiKey passed — the custom fetch in llm-provider
-  // reads a fresh token from ~/.claude/.credentials.json on every HTTP call.
   let llmOptions: { apiKey?: string; providerOverride?: string; modelOverride?: string } = {};
 
   if (envForcesClaudeCode && hasClaudeCode) {
@@ -132,8 +127,6 @@ export async function POST(req: Request) {
 
   // ═══════════════════════════════════════
   // Claude Agent SDK Mode (OAuth via CLI binary + custom VM-scoped MCP tools)
-  // The CLI handles OAuth attestation; our MCP server handles all tool execution
-  // on the Freestyle VM — no built-in CLI tools (Read/Edit/Bash) are allowed.
   // ═══════════════════════════════════════
   if (llmOptions.providerOverride === "claude-code" && !hasGlobalKey && !userApiKey) {
     console.log("[Chat] Using Claude Agent SDK (OAuth + VM-scoped MCP tools)");
@@ -151,8 +144,28 @@ export async function POST(req: Request) {
       systemPrompt,
       model: llmOptions.modelOverride ?? "sonnet",
       maxTurns: 200,
-      sourceRepoId: metadata.sourceRepoId,
+      sourceRepoId: project.id,
       metadataRepoId: repoId,
+      previewUrl: metadata.vm.previewUrl,
+      repoId,
+      conversationId,
+      onFinish: async (assistantText: string) => {
+        const latestMetadata = await readRepoMetadata(repoId);
+        if (!latestMetadata) return;
+        // Build a synthetic assistant message with the collected text
+        const assistantMessage = {
+          id: crypto.randomUUID(),
+          role: "assistant" as const,
+          parts: assistantText ? [{ type: "text" as const, text: assistantText }] : [],
+        } as UIMessage;
+        const finalMessages = [...messages, assistantMessage];
+        await saveConversationMessages(
+          repoId,
+          latestMetadata,
+          conversationId,
+          finalMessages,
+        );
+      },
     });
   }
 
@@ -160,7 +173,6 @@ export async function POST(req: Request) {
   // CodeMine Agentic Engine (default — requires API key)
   // ═══════════════════════════════════════
   if (AGENT_MODE === "codemine") {
-    // Build CodeMine tools with shared loop state
     const loopState: AgenticLoopState = {
       stepCount: 0,
       taskState: null,
@@ -172,12 +184,11 @@ export async function POST(req: Request) {
     };
 
     const tools = createCodeMineTools(vm, loopState, {
-      sourceRepoId: metadata.sourceRepoId,
+      sourceRepoId: project.id,
       metadataRepoId: repoId,
       previewUrl: metadata.vm.previewUrl,
     });
 
-    // Build system prompt
     let systemPrompt: string;
     try {
       systemPrompt = await buildCodeMinePrompt(vm, userText);
@@ -185,7 +196,6 @@ export async function POST(req: Request) {
       systemPrompt = CODEMINE_SYSTEM_PROMPT;
     }
 
-    // Run the agentic loop
     const result = await runAgenticLoop({
       system: systemPrompt,
       messages,
@@ -225,7 +235,7 @@ export async function POST(req: Request) {
   // BuildForge Legacy Mode (AGENT_MODE=buildforge)
   // ═══════════════════════════════════════
   const baseTools = createBaseTools(vm, {
-    sourceRepoId: metadata.sourceRepoId,
+    sourceRepoId: project.id,
     metadataRepoId: repoId,
   });
 
@@ -236,7 +246,7 @@ export async function POST(req: Request) {
 
     const bfContext: BuildForgeContext = {
       vm,
-      sourceRepoId: metadata.sourceRepoId,
+      sourceRepoId: project.id,
       metadataRepoId: repoId,
       projectMemory,
       currentSpec,

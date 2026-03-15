@@ -3,7 +3,7 @@
 // Common helpers for creating BuildForge tools.
 // =============================================================================
 
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import { WORKDIR } from "../../vars";
 
 /**

@@ -1,6 +1,9 @@
-import { freestyle } from "freestyle-sandboxes";
+/**
+ * Deployment status — stubbed out for local mode.
+ * No cloud deployments in local-only mode.
+ */
 
-export const DEPLOYMENT_DOMAIN_SUFFIX = "voxel.style.dev";
+export const DEPLOYMENT_DOMAIN_SUFFIX = "localhost";
 
 export type DeploymentUiStatus = {
   state: "idle" | "deploying" | "live" | "failed";
@@ -22,115 +25,32 @@ export type DeploymentTimelineEntry = {
   state: "idle" | "deploying" | "live" | "failed";
 };
 
-const isBootstrapCommit = (message: string | undefined) =>
-  (message ?? "").trim().toLowerCase() === "initial commit";
-
-export const getLatestCommitSha = async (repoId: string) => {
-  const repo = freestyle.git.repos.ref({ repoId });
-  const commits = await repo.commits.list({ limit: 50, order: "desc" });
-  const latestUserCommit = commits.commits.find(
-    (commit) => !isBootstrapCommit(commit.message),
-  );
-  return latestUserCommit?.sha ?? null;
+export const getLatestCommitSha = async (_repoId: string) => {
+  return null;
 };
 
-export const getDomainForCommit = (commitSha: string) => {
-  return `${commitSha.slice(0, 12)}-${DEPLOYMENT_DOMAIN_SUFFIX}`;
+export const getDomainForCommit = (_commitSha: string) => {
+  return "localhost";
 };
 
 export const getDeploymentStatusForLatestCommit = async (
-  repoId: string,
-  isAgentRunning: boolean,
+  _repoId: string,
+  _isAgentRunning: boolean,
 ): Promise<DeploymentUiStatus> => {
-  const commitSha = await getLatestCommitSha(repoId);
-  const updatedAt = new Date().toISOString();
-
-  if (!commitSha) {
-    return {
-      state: "idle",
-      domain: null,
-      url: null,
-      commitSha: null,
-      deploymentId: null,
-      lastError: "No commits found for repository.",
-      updatedAt,
-    };
-  }
-
-  const domain = getDomainForCommit(commitSha);
-  const { entries } = await freestyle.serverless.deployments.list({
-    limit: 200,
-  });
-
-  const match = entries.find((entry) => entry.domains.includes(domain));
-
-  if (!match) {
-    return {
-      state: isAgentRunning ? "deploying" : "idle",
-      domain,
-      url: `https://${domain}`,
-      commitSha,
-      deploymentId: null,
-      lastError: null,
-      updatedAt,
-    };
-  }
-
-  const state: DeploymentUiStatus["state"] =
-    match.state === "deployed"
-      ? "live"
-      : match.state === "failed"
-        ? "failed"
-        : "deploying";
-
   return {
-    state,
-    domain,
-    url: `https://${domain}`,
-    commitSha,
-    deploymentId: match.deploymentId,
-    lastError: state === "failed" ? "Deployment reported failed state." : null,
-    updatedAt,
+    state: "idle",
+    domain: null,
+    url: null,
+    commitSha: null,
+    deploymentId: null,
+    lastError: null,
+    updatedAt: new Date().toISOString(),
   };
 };
 
 export const getDeploymentTimelineFromCommits = async (
-  repoId: string,
-  limit = 12,
+  _repoId: string,
+  _limit = 12,
 ): Promise<DeploymentTimelineEntry[]> => {
-  const repo = freestyle.git.repos.ref({ repoId });
-  const commits = await repo.commits.list({
-    limit: 50,
-    order: "desc",
-  });
-  const { entries } = await freestyle.serverless.deployments.list({
-    limit: 500,
-  });
-
-  const userCommits = commits.commits
-    .filter((commit) => !isBootstrapCommit(commit.message))
-    .slice(0, limit);
-
-  return userCommits.map((commit) => {
-    const domain = getDomainForCommit(commit.sha);
-    const match = entries.find((entry) => entry.domains.includes(domain));
-
-    const state: DeploymentTimelineEntry["state"] = !match
-      ? "idle"
-      : match.state === "deployed"
-        ? "live"
-        : match.state === "failed"
-          ? "failed"
-          : "deploying";
-
-    return {
-      commitSha: commit.sha,
-      commitMessage: commit.message,
-      commitDate: commit.author?.date ?? new Date().toISOString(),
-      domain,
-      url: `https://${domain}`,
-      deploymentId: match?.deploymentId ?? null,
-      state,
-    };
-  });
+  return [];
 };

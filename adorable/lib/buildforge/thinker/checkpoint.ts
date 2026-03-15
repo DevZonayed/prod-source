@@ -3,7 +3,7 @@
 // Git-based rollback points using the existing commit infrastructure.
 // =============================================================================
 
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import type { Checkpoint } from "../types";
 import { WORKDIR } from "../../vars";
 

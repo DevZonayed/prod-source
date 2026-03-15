@@ -1,7 +1,7 @@
 import { tool } from "ai";
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import { z } from "zod";
-import { WORKDIR } from "../../vars";
+
 import type { AgenticLoopState } from "../types";
 import { runVmCommand, shellQuote, readVmFile } from "./helpers";
 
@@ -22,7 +22,7 @@ export function createIdeContextTools(vm: Vm, state: AgenticLoopState) {
         // Run TypeScript type checking
         const tscResult = await runVmCommand(
           vm,
-          `cd ${shellQuote(WORKDIR)} && npx tsc --noEmit --pretty false 2>&1 | head -100`,
+          `npx tsc --noEmit --pretty false 2>&1 | head -100`,
         );
 
         // Get dev server logs and extract errors
@@ -101,7 +101,7 @@ export function createIdeContextTools(vm: Vm, state: AgenticLoopState) {
           .describe("Glob pattern to filter files (e.g. '*.ts', '*.tsx')"),
       }),
       execute: async ({ OldName, NewName, DirectoryPath, FilePattern }) => {
-        const searchDir = DirectoryPath ?? WORKDIR;
+        const searchDir = DirectoryPath ?? ".";
         const includeFlag = FilePattern
           ? `--include=${shellQuote(FilePattern)}`
           : "--include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx'";

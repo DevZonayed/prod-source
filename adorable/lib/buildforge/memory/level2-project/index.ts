@@ -3,7 +3,7 @@
 // Reads/writes memory files stored in the VM at .buildforge/memory/
 // =============================================================================
 
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import type { MemoryFileType, ProjectMemoryState, AppSpec } from "../../types";
 import { MEMORY_FILES, SPEC_FILE, BUILDFORGE_DIR, MEMORY_DIR } from "../../constants";
 import { MEMORY_TEMPLATES } from "./templates";

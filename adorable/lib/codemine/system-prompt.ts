@@ -1,4 +1,4 @@
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import { WORKDIR, VM_PORT } from "../vars";
 
 /**

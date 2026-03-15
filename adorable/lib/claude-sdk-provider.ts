@@ -20,14 +20,14 @@ import {
   createSdkMcpServer,
 } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import {
   createUIMessageStream,
   createUIMessageStreamResponse,
   type UIMessage,
 } from "ai";
 
-import { WORKDIR, VM_PORT } from "./vars";
+import { VM_PORT } from "./vars";
 import {
   resolveAbsPath,
   readVmFile,
@@ -41,9 +41,8 @@ import {
   MAX_VIEW_FILE_LINES,
   MAX_GREP_RESULTS,
 } from "./codemine/constants";
-import { getDomainForCommit } from "./deployment-status";
-import { addRepoDeployment, readRepoMetadata } from "./repo-storage";
-import { freestyle } from "freestyle-sandboxes";
+import { readRepoMetadata } from "./repo-storage";
+import { buildInitialEphemeral } from "./codemine/ephemeral";
 
 // ─── MCP Server Name ───
 
@@ -61,7 +60,18 @@ type SdkProviderOptions = {
   maxTurns?: number;
   sourceRepoId?: string;
   metadataRepoId?: string;
+  repoId?: string;
+  conversationId?: string;
+  previewUrl?: string;
+  onFinish?: (assistantText: string) => Promise<void>;
 };
+
+/**
+ * Strip MCP server prefix from tool name for clean UI display.
+ * e.g. "mcp__voxel-vm__view_file" → "view_file"
+ */
+const stripToolPrefix = (name: string): string =>
+  name.replace(/^mcp__[^_]+__/, "");
 
 // ─── Build MCP Server with VM-scoped tools ───
 
@@ -82,7 +92,7 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
         },
         async (args) => {
           const absPath = resolveAbsPath(args.AbsolutePath);
-          if (!absPath) return { content: [{ type: "text" as const, text: `Error: Invalid path: ${args.AbsolutePath}. Must be within ${WORKDIR}.` }] };
+          if (!absPath) return { content: [{ type: "text" as const, text: `Error: Invalid path: ${args.AbsolutePath}. Must be within the workspace.` }] };
 
           const fileContent = await readVmFile(vm, absPath);
           if (fileContent === null) return { content: [{ type: "text" as const, text: `Error: File not found: ${absPath}` }] };
@@ -200,7 +210,7 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
           CaseSensitive: z.boolean().default(true).describe("Case-sensitive search"),
         },
         async (args) => {
-          const searchDir = args.DirectoryPath ? resolveAbsPath(args.DirectoryPath) ?? WORKDIR : WORKDIR;
+          const searchDir = args.DirectoryPath ? resolveAbsPath(args.DirectoryPath) ?? "." : ".";
           const flags = ["-rn", "--color=never"];
           if (!args.CaseSensitive) flags.push("-i");
           if (args.FilePattern) flags.push(`--include=${shellQuote(args.FilePattern)}`);
@@ -221,7 +231,7 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
           Type: z.enum(["file", "directory", "any"]).default("any").describe("Filter by type"),
         },
         async (args) => {
-          const searchDir = args.DirectoryPath ? resolveAbsPath(args.DirectoryPath) ?? WORKDIR : WORKDIR;
+          const searchDir = args.DirectoryPath ? resolveAbsPath(args.DirectoryPath) ?? "." : ".";
           const typeFlag = args.Type === "file" ? "-type f" : args.Type === "directory" ? "-type d" : "";
           const cmd = `find ${shellQuote(searchDir)} ${typeFlag} -name ${shellQuote(args.SearchPattern)} -not -path '*/node_modules/*' -not -path '*/.next/*' -not -path '*/.git/*' 2>/dev/null | head -100 | sort`;
           const result = await runVmCommand(vm, cmd);
@@ -240,8 +250,10 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
           Timeout: z.number().int().min(1).max(300).default(30).describe("Timeout in seconds"),
         },
         async (args) => {
-          const cwd = args.WorkingDirectory ? resolveAbsPath(args.WorkingDirectory) ?? WORKDIR : WORKDIR;
-          const wrapped = `cd ${shellQuote(cwd)} && timeout ${args.Timeout} bash -c ${shellQuote(args.Command)} 2>&1`;
+          const cwd = args.WorkingDirectory ? resolveAbsPath(args.WorkingDirectory) ?? "." : ".";
+          const wrapped = cwd === "."
+            ? `timeout ${args.Timeout} bash -c ${shellQuote(args.Command)} 2>&1`
+            : `cd ${shellQuote(cwd)} && timeout ${args.Timeout} bash -c ${shellQuote(args.Command)} 2>&1`;
           const result = await runVmCommand(vm, wrapped);
           const output = [
             result.stdout ? `stdout:\n${result.stdout}` : "",
@@ -259,8 +271,8 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
         "Show working tree status and current branch.",
         {},
         async () => {
-          const status = await runVmCommand(vm, `cd ${shellQuote(WORKDIR)} && git status --porcelain`);
-          const branch = await runVmCommand(vm, `cd ${shellQuote(WORKDIR)} && git branch --show-current`);
+          const status = await runVmCommand(vm, `git status --porcelain`);
+          const branch = await runVmCommand(vm, `git branch --show-current`);
           return {
             content: [{
               type: "text" as const,
@@ -279,8 +291,8 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
         async (args) => {
           const pathArg = args.Path ? ` -- ${shellQuote(args.Path)}` : "";
           const [staged, unstaged] = await Promise.all([
-            runVmCommand(vm, `cd ${shellQuote(WORKDIR)} && git diff --cached${pathArg}`),
-            runVmCommand(vm, `cd ${shellQuote(WORKDIR)} && git diff${pathArg}`),
+            runVmCommand(vm, `git diff --cached${pathArg}`),
+            runVmCommand(vm, `git diff${pathArg}`),
           ]);
           return {
             content: [{
@@ -298,7 +310,7 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
           MaxEntries: z.number().int().min(1).max(50).default(10).describe("Max log entries"),
         },
         async (args) => {
-          const result = await runVmCommand(vm, `cd ${shellQuote(WORKDIR)} && git log --oneline --no-decorate -${args.MaxEntries}`);
+          const result = await runVmCommand(vm, `git log --oneline --no-decorate -${args.MaxEntries}`);
           return { content: [{ type: "text" as const, text: result.stdout || "(no commits yet)" }] };
         },
       ),
@@ -310,10 +322,10 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
           Message: z.string().describe("Commit message"),
         },
         async (args) => {
-          const gitCmd = (cmd: string) => runVmCommand(vm, `cd ${shellQuote(WORKDIR)} && git ${cmd}`);
+          const gitCmd = (cmd: string) => runVmCommand(vm, `git ${cmd}`);
 
           await gitCmd(`config user.name "Voxel"`);
-          await gitCmd(`config user.email "voxel@freestyle.sh"`);
+          await gitCmd(`config user.email "voxel@local"`);
 
           const commitResult = await gitCmd(`commit -am ${shellQuote(args.Message)}`);
           if (!commitResult.ok) {
@@ -321,31 +333,7 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
           }
 
           await gitCmd("pull --rebase --no-edit 2>/dev/null || true");
-          const pushResult = await gitCmd("push 2>&1");
-
-          // Async deployment trigger
-          if (options?.sourceRepoId && options?.metadataRepoId) {
-            (async () => {
-              try {
-                const headResult = await gitCmd("rev-parse --short=7 HEAD");
-                const sha = headResult.stdout.trim();
-                if (!sha) return;
-                const domain = getDomainForCommit(sha);
-                const metadata = await readRepoMetadata(options.metadataRepoId!);
-                if (!metadata) return;
-                await addRepoDeployment(options.metadataRepoId!, metadata, {
-                  commitSha: sha, commitMessage: args.Message,
-                  commitDate: new Date().toISOString(), domain,
-                  url: `https://${domain}`, deploymentId: null, state: "deploying",
-                });
-                await freestyle.serverless.deployments.create({
-                  repo: options.sourceRepoId!, domains: [domain], build: true,
-                });
-              } catch (e) {
-                console.error("Deployment trigger failed:", e);
-              }
-            })();
-          }
+          const pushResult = await gitCmd("push 2>&1 || true");
 
           return { content: [{ type: "text" as const, text: `Committed and pushed.\n${commitResult.stdout}\n${pushResult.stdout}` }] };
         },
@@ -420,8 +408,6 @@ export function createClaudeSdkStreamResponse(
     metadataRepoId: options.metadataRepoId,
   });
 
-  // Agent SDK requires an async generator for prompt when using MCP servers.
-  // We yield the full conversation as user messages so the model has context.
   const sessionId = crypto.randomUUID();
   async function* generateMessages() {
     const conversationText = buildConversationPrompt(messages);
@@ -438,50 +424,174 @@ export function createClaudeSdkStreamResponse(
 
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
-      const textId = crypto.randomUUID();
-      let hasStartedText = false;
+      let currentTextId: string | null = null;
+      let inStep = false;
       let totalInputTokens = 0;
       let totalOutputTokens = 0;
+
+      // Collect final text for message saving
+      let collectedText = "";
+
+      // Track active tool calls by content_block index
+      const activeToolCalls = new Map<
+        number,
+        { toolCallId: string; toolName: string; argsJson: string }
+      >();
+      // Track tool calls that have been emitted (to avoid duplicates from assistant message)
+      const emittedToolCallIds = new Set<string>();
+
+      const ensureStep = () => {
+        if (!inStep) {
+          writer.write({ type: "start-step" });
+          inStep = true;
+        }
+      };
+
+      const endText = () => {
+        if (currentTextId) {
+          writer.write({ type: "text-end", id: currentTextId });
+          currentTextId = null;
+        }
+      };
+
+      const endStep = () => {
+        endText();
+        if (inStep) {
+          writer.write({ type: "finish-step" });
+          inStep = false;
+        }
+      };
+
+      // Build initial ephemeral context with sandbox state
+      const { errors: devServerErrors } = await getDevServerLogs(vm);
+      const initialEphemeral = buildInitialEphemeral({
+        stepId: 0,
+        sandboxState: {
+          previewUrl: options.previewUrl ?? "N/A",
+          devServerRunning: true,
+          devServerErrors,
+        },
+        diagnostics: devServerErrors,
+        kiSummaries: [],
+        warnings: [],
+      });
+      const systemPromptWithEphemeral = options.systemPrompt + "\n\n" + initialEphemeral;
 
       try {
         for await (const message of query({
           prompt: generateMessages(),
           options: {
-            systemPrompt: options.systemPrompt,
+            systemPrompt: systemPromptWithEphemeral,
             model: options.model ?? "sonnet",
             maxTurns: options.maxTurns ?? 200,
             mcpServers: { [MCP_SERVER_NAME]: mcpServer },
             allowedTools: ALL_VM_TOOL_NAMES,
+            tools: [],
             permissionMode: "bypassPermissions",
             includePartialMessages: true,
           },
         })) {
-          // Stream text deltas
+          // ─── Stream events (real-time text + tool call streaming) ───
           if (message.type === "stream_event") {
             const event = message.event as Record<string, unknown>;
             const eventType = event.type as string;
 
+            // --- Content block start ---
+            if (eventType === "content_block_start") {
+              const block = event.content_block as Record<string, unknown> | undefined;
+              if (block?.type === "text") {
+                ensureStep();
+                currentTextId = crypto.randomUUID();
+                writer.write({ type: "text-start", id: currentTextId });
+              } else if (block?.type === "tool_use") {
+                endText();
+                ensureStep();
+                const rawName = (block.name as string) || "unknown";
+                const cleanName = stripToolPrefix(rawName);
+                const toolCallId = (block.id as string) || crypto.randomUUID();
+                const idx = typeof event.index === "number" ? event.index : -1;
+                activeToolCalls.set(idx, { toolCallId, toolName: cleanName, argsJson: "" });
+                emittedToolCallIds.add(toolCallId);
+                writer.write({
+                  type: "tool-input-start",
+                  toolCallId,
+                  toolName: cleanName,
+                });
+              }
+            }
+
+            // --- Content block delta ---
             if (eventType === "content_block_delta") {
               const delta = event.delta as Record<string, unknown> | undefined;
               if (delta?.type === "text_delta" && typeof delta.text === "string") {
-                if (!hasStartedText) {
-                  writer.write({ type: "start-step" });
-                  writer.write({ type: "text-start", id: textId });
-                  hasStartedText = true;
+                if (!currentTextId) {
+                  ensureStep();
+                  currentTextId = crypto.randomUUID();
+                  writer.write({ type: "text-start", id: currentTextId });
                 }
-                writer.write({ type: "text-delta", id: textId, delta: delta.text });
+                writer.write({ type: "text-delta", id: currentTextId, delta: delta.text });
+                collectedText += delta.text;
+              } else if (delta?.type === "input_json_delta" && typeof delta.partial_json === "string") {
+                const idx = typeof event.index === "number" ? event.index : -1;
+                const tc = activeToolCalls.get(idx);
+                if (tc) {
+                  tc.argsJson += delta.partial_json;
+                  writer.write({
+                    type: "tool-input-delta",
+                    toolCallId: tc.toolCallId,
+                    inputTextDelta: delta.partial_json,
+                  });
+                }
               }
-            } else if (eventType === "message_delta") {
-              // Extract usage from message_delta
+            }
+
+            // --- Content block stop ---
+            if (eventType === "content_block_stop") {
+              // End text block if active
+              if (currentTextId) {
+                writer.write({ type: "text-end", id: currentTextId });
+                currentTextId = null;
+              }
+              // End tool_use block if active — mark as complete
+              const stopIdx = typeof event.index === "number" ? event.index : -1;
+              const stoppedTc = activeToolCalls.get(stopIdx);
+              if (stoppedTc) {
+                let parsedInput: unknown = {};
+                try { parsedInput = JSON.parse(stoppedTc.argsJson || "{}"); } catch { /* */ }
+                // Mark input as ready
+                writer.write({
+                  type: "tool-input-available",
+                  toolCallId: stoppedTc.toolCallId,
+                  toolName: stoppedTc.toolName,
+                  input: parsedInput,
+                });
+                // Mark output as complete — SDK executes tools internally via MCP,
+                // so we emit output immediately to stop the spinner
+                writer.write({
+                  type: "tool-output-available",
+                  toolCallId: stoppedTc.toolCallId,
+                  output: "Completed",
+                });
+                activeToolCalls.delete(stopIdx);
+              }
+            }
+
+            // --- Message delta (usage) ---
+            if (eventType === "message_delta") {
               const usage = event.usage as Record<string, number> | undefined;
               if (usage) {
                 totalInputTokens += usage.input_tokens ?? 0;
                 totalOutputTokens += usage.output_tokens ?? 0;
               }
             }
+
+            // --- Message stop (end of one assistant turn) ---
+            if (eventType === "message_stop") {
+              endStep();
+            }
           }
 
-          // Handle complete assistant messages (for tool call display)
+          // ─── Complete assistant message (fallback for tool calls not caught by stream events) ───
           if (message.type === "assistant") {
             const msg = message as Record<string, unknown>;
             const content = (msg.message as Record<string, unknown>)?.content;
@@ -489,40 +599,100 @@ export function createClaudeSdkStreamResponse(
               for (const block of content) {
                 const b = block as Record<string, unknown>;
                 if (b.type === "tool_use" && typeof b.name === "string") {
-                  // Write tool call as text so user can see what's happening
-                  if (!hasStartedText) {
-                    writer.write({ type: "start-step" });
-                    writer.write({ type: "text-start", id: textId });
-                    hasStartedText = true;
+                  const toolCallId = (b.id as string) || crypto.randomUUID();
+                  // Only emit if not already streamed via stream_event
+                  if (!emittedToolCallIds.has(toolCallId)) {
+                    endText();
+                    ensureStep();
+                    const cleanName = stripToolPrefix(b.name);
+                    emittedToolCallIds.add(toolCallId);
+                    writer.write({
+                      type: "tool-input-start",
+                      toolCallId,
+                      toolName: cleanName,
+                    });
+                    // Emit args at once
+                    const argsStr = JSON.stringify(b.input ?? {});
+                    writer.write({
+                      type: "tool-input-delta",
+                      toolCallId,
+                      inputTextDelta: argsStr,
+                    });
+                    // Mark as complete
+                    writer.write({
+                      type: "tool-input-available",
+                      toolCallId,
+                      toolName: cleanName,
+                      input: b.input ?? {},
+                    });
+                    writer.write({
+                      type: "tool-output-available",
+                      toolCallId,
+                      output: "Completed",
+                    });
                   }
+                }
+                // Collect any text from assistant message
+                if (b.type === "text" && typeof b.text === "string") {
+                  // Text may already be streamed; only add if not yet captured
+                  if (!collectedText.includes(b.text.slice(0, 50))) {
+                    collectedText += b.text;
+                  }
+                }
+              }
+            }
+            // End step after processing assistant message
+            endStep();
+          }
+
+          // ─── Tool progress (tool execution happening) ───
+          if (message.type === "tool_progress") {
+            const msg = message as Record<string, unknown>;
+            const toolUseId = msg.tool_use_id as string;
+            if (toolUseId && emittedToolCallIds.has(toolUseId)) {
+              // Tool is executing — the spinner is already showing via status
+            }
+          }
+
+          // ─── Tool use summary (tool execution completed) ───
+          if (message.type === "tool_use_summary") {
+            const msg = message as Record<string, unknown>;
+            const toolUseIds = msg.preceding_tool_use_ids as string[] | undefined;
+            const summary = msg.summary as string | undefined;
+
+            if (toolUseIds && summary) {
+              for (const toolUseId of toolUseIds) {
+                if (emittedToolCallIds.has(toolUseId)) {
+                  ensureStep();
                   writer.write({
-                    type: "text-delta",
-                    id: textId,
-                    delta: `\n\n[Using ${(b.name as string).replace(`${MCP_SERVER_NAME}__`, "")}...]\n`,
+                    type: "tool-output-available",
+                    toolCallId: toolUseId,
+                    output: summary,
                   });
+                  endStep();
                 }
               }
             }
           }
 
-          // Handle result message
+          // ─── Final result ───
           if (message.type === "result") {
             const msg = message as Record<string, unknown>;
-            // If result has text and we haven't streamed yet, write it
-            if (typeof msg.result === "string" && msg.result && !hasStartedText) {
-              writer.write({ type: "start-step" });
-              writer.write({ type: "text-start", id: textId });
-              writer.write({ type: "text-delta", id: textId, delta: msg.result });
-              hasStartedText = true;
+            if (typeof msg.result === "string" && msg.result) {
+              if (!collectedText) {
+                ensureStep();
+                const resultTextId = crypto.randomUUID();
+                writer.write({ type: "text-start", id: resultTextId });
+                writer.write({ type: "text-delta", id: resultTextId, delta: msg.result });
+                writer.write({ type: "text-end", id: resultTextId });
+                collectedText += msg.result;
+              }
             }
           }
         }
 
-        // Finalize
-        if (hasStartedText) {
-          writer.write({ type: "text-end", id: textId });
-          writer.write({ type: "finish-step" });
-        }
+        // Finalize any open step
+        endStep();
 
         writer.write({
           type: "finish",
@@ -536,16 +706,22 @@ export function createClaudeSdkStreamResponse(
             }],
           },
         });
+
+        // Save the collected response via callback
+        if (options.onFinish) {
+          try {
+            await options.onFinish(collectedText);
+          } catch (saveErr) {
+            console.error("[ClaudeSDK] Failed to save messages:", saveErr);
+          }
+        }
       } catch (err) {
         console.error("[ClaudeSDK] Error:", err instanceof Error ? err.stack : err);
 
         const errMsg = err instanceof Error ? err.message : "Claude SDK error";
         const errTextId = crypto.randomUUID();
 
-        if (hasStartedText) {
-          writer.write({ type: "text-end", id: textId });
-          writer.write({ type: "finish-step" });
-        }
+        endStep();
 
         writer.write({ type: "start-step" });
         writer.write({ type: "text-start", id: errTextId });

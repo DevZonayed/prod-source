@@ -1,4 +1,4 @@
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import { VM_PORT, WORKDIR } from "./vars";
 import { isInitialized, getProjectMemoryState, assembleGeneralContext, readSpec } from "./buildforge/memory";
 import { detectStackRequirement, loadRelevantSkills, type StackDecision } from "./skills-loader";

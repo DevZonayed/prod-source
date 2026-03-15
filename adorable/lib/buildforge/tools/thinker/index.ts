@@ -5,7 +5,7 @@
 
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
-import type { Vm } from "freestyle-sandboxes";
+import type { Vm } from "@/lib/local-vm";
 import type { BuildForgeContext, TaskType } from "../../types";
 import { decompose } from "../../thinker/decompose";
 import { createPlan, getNextTasks, isPlanComplete } from "../../thinker/planner";

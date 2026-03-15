@@ -1,14 +1,14 @@
-import { freestyle, VmSpec } from "freestyle-sandboxes";
-import { VmDevServer } from "@freestyle-sh/with-dev-server";
-import { VmPtySession } from "@freestyle-sh/with-pty";
-import { VmWebTerminal } from "@freestyle-sh/with-ttyd";
+import { LocalVm, getOrCreateLocalVm } from "@/lib/local-vm";
+import { DockerVm, getOrCreateDockerVm } from "@/lib/docker-vm";
 import {
-  VM_PORT,
-  WORKDIR,
-  DEV_COMMAND_TERMINAL_PORT,
-  TEMPLATE_REPO,
-  ADDITIONAL_TERMINALS_PORT,
-} from "@/lib/vars";
+  isDockerAvailable,
+  ensureSandboxImage,
+  getOrCreateContainer,
+} from "@/lib/docker-manager";
+import { getProject, updateProject } from "@/lib/local-storage";
+import { getProjectDir, APP_PORT } from "@/lib/vars";
+import { allocatePort } from "@/lib/port-manager";
+import type { Vm } from "@/lib/local-vm";
 
 export type VmRuntimeMetadata = {
   vmId: string;
@@ -17,80 +17,93 @@ export type VmRuntimeMetadata = {
   additionalTerminalsUrl: string;
 };
 
-const devCommandPty = new VmPtySession({
-  sessionId: "voxel-dev-command",
-});
+let _dockerAvailable: boolean | null = null;
+let _imageReady = false;
 
-export const voxelVmSpec = new VmSpec({
-  with: {
-    devCommandPty,
-    devServer: new VmDevServer({
-      workdir: WORKDIR,
-      templateRepo: TEMPLATE_REPO,
-      devCommandPty,
-    }),
-    devCommandTerminal: new VmWebTerminal({
-      pty: devCommandPty,
-      port: DEV_COMMAND_TERMINAL_PORT,
-      theme: {
-        background: "#09090b",
-      },
-    }),
-    additionalTerminals: new VmWebTerminal({
-      cwd: WORKDIR,
-      port: ADDITIONAL_TERMINALS_PORT,
-    }),
-  },
-});
+async function checkDocker(): Promise<boolean> {
+  if (_dockerAvailable !== null) return _dockerAvailable;
+  _dockerAvailable = await isDockerAvailable();
+  if (_dockerAvailable && !_imageReady) {
+    try {
+      await ensureSandboxImage();
+      _imageReady = true;
+    } catch (err) {
+      console.error("[Docker] Failed to build sandbox image:", err);
+      _dockerAvailable = false;
+    }
+  }
+  if (!_dockerAvailable) {
+    console.warn("[VM] Docker not available, falling back to LocalVm (no isolation)");
+  }
+  return _dockerAvailable;
+}
 
+/**
+ * Create a VM (Docker container or local fallback) for a project.
+ */
 export const createVmForRepo = async (
-  repoId: string,
+  projectId: string,
+  projectPath?: string,
 ): Promise<VmRuntimeMetadata> => {
-  const domain = `${crypto.randomUUID()}-voxel.style.dev`;
-  const devCommandTerminalDomain = `dev-command-${domain}`;
-  const additionalTerminalsDomain = `terminals-${domain}`;
+  const projectDir = projectPath || getProjectDir(projectId);
+  const port = await allocatePort(projectId);
+  const useDocker = await checkDocker();
 
-  const { vmId } = await freestyle.vms.create({
-    snapshot: voxelVmSpec,
-    recreate: true,
-    workdir: WORKDIR,
-    persistence: {
-      type: "sticky",
-    },
-    git: {
-      repos: [
-        {
-          path: WORKDIR,
-          repo: repoId,
-        },
-      ],
-      config: {
-        user: {
-          name: "Voxel",
-          email: "voxel@freestyle.sh",
-        },
-      },
-    },
-    domains: [
-      {
-        domain,
-        vmPort: VM_PORT,
-      },
-      {
-        domain: devCommandTerminalDomain,
-        vmPort: DEV_COMMAND_TERMINAL_PORT,
-      },
-      {
-        domain: additionalTerminalsDomain,
-        vmPort: ADDITIONAL_TERMINALS_PORT,
-      },
-    ],
-  });
+  if (useDocker) {
+    // Get existing container ID from DB if available
+    const project = getProject(projectId);
+    const existingContainerId = project?.containerId;
+
+    const containerId = await getOrCreateContainer(
+      projectId,
+      projectDir,
+      port,
+      existingContainerId,
+    );
+
+    // Save container ID to DB
+    if (project && project.containerId !== containerId) {
+      updateProject(projectId, { containerId });
+    }
+
+    getOrCreateDockerVm(projectId, containerId, projectDir);
+  } else {
+    getOrCreateLocalVm(projectId, projectDir);
+  }
 
   return {
-    vmId,
-    previewUrl: `https://${domain}`,
-    devCommandTerminalUrl: `https://${devCommandTerminalDomain}`,
-    additionalTerminalsUrl: `https://${additionalTerminalsDomain}`,
+    vmId: projectId,
+    previewUrl: `http://localhost:${port}`,
+    devCommandTerminalUrl: `ws://localhost:${APP_PORT}/ws/terminal?projectId=${projectId}`,
+    additionalTerminalsUrl: `ws://localhost:${APP_PORT}/ws/terminal?projectId=${projectId}&session=additional`,
   };
+};
+
+/**
+ * Get a reference to an existing VM (Docker or Local).
+ */
+export const getVmRef = (
+  projectId: string,
+  projectPath?: string,
+): Vm => {
+  const projectDir = projectPath || getProjectDir(projectId);
+
+  // Check if we already have an active DockerVm
+  const { getActiveDockerVm } = require("@/lib/docker-vm");
+  const existingDocker = getActiveDockerVm(projectId);
+  if (existingDocker) return existingDocker;
+
+  // Check if we have an active LocalVm
+  const { getActiveVm } = require("@/lib/local-vm");
+  const existingLocal = getActiveVm(projectId);
+  if (existingLocal) return existingLocal;
+
+  // No active VM — check if project has a container ID
+  const project = getProject(projectId);
+  if (project?.containerId) {
+    return getOrCreateDockerVm(projectId, project.containerId, projectDir);
+  }
+
+  // Fallback to LocalVm
+  return getOrCreateLocalVm(projectId, projectDir);
 };
