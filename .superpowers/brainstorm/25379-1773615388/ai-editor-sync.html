@@ -1,0 +1,89 @@
+<h2>AI + Editor Sync: How should AI file changes appear in the editor?</h2>
+<p class="subtitle">When the AI writes or modifies files via tools (writeFile, replaceInFile), how should the code editor reflect those changes?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Auto-Open & Live Update</h3>
+      <p>When the AI creates or modifies a file, it <strong>automatically opens as a tab</strong> in the editor and the content updates in real-time. The editor auto-switches to the file being modified. User sees the AI "typing" code live.</p>
+      <div style="background:#1a1a2e;border-radius:8px;padding:16px;margin-top:12px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+            <div style="width:40px;height:40px;background:#1e3a5f;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;">&#129302;</div>
+            <div style="color:#58a6ff;font-size:9px;">AI writes</div>
+          </div>
+          <div style="color:#444;font-size:20px;">&#8594;</div>
+          <div style="flex:1;background:#1e1e1e;border-radius:6px;padding:8px;border:1px solid #007acc;">
+            <div style="display:flex;gap:0;margin-bottom:6px;">
+              <div style="padding:3px 8px;border-top:2px solid #007acc;color:#fff;font-size:9px;background:#1e1e1e;">page.tsx &#9679;</div>
+            </div>
+            <div style="font-family:monospace;font-size:10px;">
+              <div><span style="color:#569cd6;">export default</span> <span style="color:#dcdcaa;">Home</span>() {</div>
+              <div style="margin-left:8px;"><span style="color:#c586c0;">return</span> (</div>
+              <div style="margin-left:12px;color:#3fb950;background:#0d2818;padding:1px 4px;border-radius:2px;">&lt;h1&gt;Welcome&lt;/h1&gt; <span style="color:#3fb950;font-size:8px;">&#x25C0; just written</span></div>
+            </div>
+          </div>
+          <div style="color:#444;font-size:20px;">&#8594;</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+            <div style="width:40px;height:40px;background:#152a15;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;">&#127760;</div>
+            <div style="color:#3fb950;font-size:9px;">Preview updates</div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul><li>User sees exactly what AI is doing</li><li>Feels magical — like pair programming</li><li>Builds trust and transparency</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Can be distracting if AI edits many files fast</li><li>Editor may flicker during rapid changes</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Update Silently, Highlight Changed Files</h3>
+      <p>File contents update in the background. Changed files get a <strong>dot indicator</strong> on their tab and in the file tree (like unsaved changes in VS Code). User stays on whatever file they were viewing — no auto-switching.</p>
+      <div style="background:#1e1e1e;border-radius:8px;padding:12px;margin-top:12px;">
+        <div style="display:flex;gap:0;margin-bottom:8px;">
+          <div style="padding:4px 12px;border-top:2px solid #007acc;color:#fff;font-size:10px;background:#1e1e1e;">globals.css</div>
+          <div style="padding:4px 12px;color:#e8ab53;font-size:10px;background:#2d2d2d;">page.tsx <span style="color:#e8ab53;">&#9679;</span></div>
+          <div style="padding:4px 12px;color:#e8ab53;font-size:10px;background:#2d2d2d;">layout.tsx <span style="color:#e8ab53;">&#9679;</span></div>
+        </div>
+        <div style="color:#888;font-size:10px;text-align:center;padding:20px;">You stay on your current file. Yellow dots = AI modified these.</div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Non-disruptive</li><li>User stays in control</li><li>Clear indication of what changed</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>User might miss important changes</li><li>Less "wow" factor</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Smart: Auto-Open First File, Then Dot Indicators</h3>
+      <p>When the AI starts a new generation pass, it <strong>auto-opens the first file</strong> being modified. Subsequent files in the same pass update silently with dot indicators. This gives the "live coding" feel without overwhelming the user during multi-file edits.</p>
+      <div style="background:#1a1a2e;border-radius:8px;padding:16px;margin-top:12px;">
+        <div style="display:flex;gap:12px;font-size:11px;">
+          <div style="flex:1;text-align:center;padding:10px;background:#152a15;border-radius:6px;">
+            <div style="color:#3fb950;font-weight:600;">1st file</div>
+            <div style="color:#888;margin-top:4px;">Auto-opens in editor</div>
+            <div style="color:#3fb950;margin-top:2px;">Live content update</div>
+          </div>
+          <div style="display:flex;align-items:center;color:#444;">&#8594;</div>
+          <div style="flex:1;text-align:center;padding:10px;background:#2a2215;border-radius:6px;">
+            <div style="color:#e8ab53;font-weight:600;">2nd+ files</div>
+            <div style="color:#888;margin-top:4px;">Silent update</div>
+            <div style="color:#e8ab53;margin-top:2px;">Dot indicator &#9679;</div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Best of both worlds</li><li>Shows AI progress without chaos</li><li>User can click dots to see other changes</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Slightly more complex logic</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:20px;">My recommendation: <strong>Option A</strong> — Auto-open and live update. This is the most impressive UX and what users expect from AI builders. Seeing the AI write code in real-time is the magic moment. We can add a small debounce to prevent flicker during rapid edits.</p>

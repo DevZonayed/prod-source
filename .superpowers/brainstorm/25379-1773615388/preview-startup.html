@@ -1,0 +1,134 @@
+<h2>Preview Startup: What should the user see before the app is ready?</h2>
+<p class="subtitle">Currently the iframe shows "localhost refused to connect" while the container boots and installs dependencies. This takes 30-60 seconds. What should happen instead?</p>
+
+<div class="section">
+  <h3>The Problem Timeline</h3>
+  <div style="background:#1a1a2e;border-radius:8px;padding:16px;margin-bottom:16px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <div style="width:10px;height:10px;border-radius:50%;background:#f85149;"></div>
+      <div style="color:#f85149;font-size:13px;font-weight:600;">Current: Broken experience</div>
+    </div>
+    <div style="display:flex;gap:4px;font-size:11px;color:#888;">
+      <div style="flex:1;text-align:center;padding:8px 4px;background:#2a1215;border-radius:4px;">
+        <div style="color:#f85149;font-weight:600;">T+0s</div>
+        <div style="margin-top:4px;">Page loads</div>
+        <div style="color:#f85149;margin-top:2px;">iframe: "refused to connect"</div>
+      </div>
+      <div style="color:#444;display:flex;align-items:center;">&#8594;</div>
+      <div style="flex:1;text-align:center;padding:8px 4px;background:#2a1215;border-radius:4px;">
+        <div style="color:#f85149;font-weight:600;">T+5s</div>
+        <div style="margin-top:4px;">Container starting</div>
+        <div style="color:#f85149;margin-top:2px;">Still "refused to connect"</div>
+      </div>
+      <div style="color:#444;display:flex;align-items:center;">&#8594;</div>
+      <div style="flex:1;text-align:center;padding:8px 4px;background:#2a1215;border-radius:4px;">
+        <div style="color:#f85149;font-weight:600;">T+30s</div>
+        <div style="margin-top:4px;">npm install running</div>
+        <div style="color:#f85149;margin-top:2px;">Still "refused to connect"</div>
+      </div>
+      <div style="color:#444;display:flex;align-items:center;">&#8594;</div>
+      <div style="flex:1;text-align:center;padding:8px 4px;background:#152a15;border-radius:4px;">
+        <div style="color:#3fb950;font-weight:600;">T+60s</div>
+        <div style="margin-top:4px;">Dev server ready</div>
+        <div style="color:#3fb950;margin-top:2px;">Finally loads!</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Scaffold First, Preview Instantly</h3>
+      <p>When user creates a project, <strong>immediately scaffold a working Next.js app</strong> (pre-built template in the Docker image) before the AI starts modifying code. The preview shows the default Next.js page within seconds, then updates live as the AI writes code.</p>
+      <div style="display:flex;gap:4px;font-size:11px;color:#888;margin-top:12px;">
+        <div style="flex:1;text-align:center;padding:8px 4px;background:#152a15;border-radius:4px;">
+          <div style="color:#3fb950;font-weight:600;">T+3s</div>
+          <div style="margin-top:4px;">Template copied</div>
+          <div style="color:#3fb950;margin-top:2px;">Preview: Next.js default page</div>
+        </div>
+        <div style="color:#444;display:flex;align-items:center;">&#8594;</div>
+        <div style="flex:1;text-align:center;padding:8px 4px;background:#152a15;border-radius:4px;">
+          <div style="color:#3fb950;font-weight:600;">T+5s</div>
+          <div style="margin-top:4px;">AI starts editing</div>
+          <div style="color:#3fb950;margin-top:2px;">Preview: Hot-reloads live</div>
+        </div>
+        <div style="color:#444;display:flex;align-items:center;">&#8594;</div>
+        <div style="flex:1;text-align:center;padding:8px 4px;background:#152a15;border-radius:4px;">
+          <div style="color:#3fb950;font-weight:600;">T+30s</div>
+          <div style="margin-top:4px;">AI finished</div>
+          <div style="color:#3fb950;margin-top:2px;">Preview: Complete app</div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Instant gratification</li><li>User sees progress in real-time</li><li>No "refused to connect" ever</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Needs pre-built template in Docker image</li><li>node_modules must be pre-installed</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Smart Loading Screen (No iframe until ready)</h3>
+      <p><strong>Don't render the iframe at all</strong> until the dev server responds. Instead, show a polished loading screen with real-time status updates: "Creating container... Installing dependencies... Starting dev server..."</p>
+      <div style="display:flex;gap:4px;font-size:11px;color:#888;margin-top:12px;">
+        <div style="flex:1;text-align:center;padding:8px 4px;background:#1a1a2e;border-radius:4px;">
+          <div style="color:#58a6ff;font-weight:600;">T+0s</div>
+          <div style="margin-top:4px;">Loading screen</div>
+          <div style="color:#58a6ff;margin-top:2px;">"Creating environment..."</div>
+        </div>
+        <div style="color:#444;display:flex;align-items:center;">&#8594;</div>
+        <div style="flex:1;text-align:center;padding:8px 4px;background:#1a1a2e;border-radius:4px;">
+          <div style="color:#58a6ff;font-weight:600;">T+30s</div>
+          <div style="margin-top:4px;">Loading screen</div>
+          <div style="color:#58a6ff;margin-top:2px;">"Starting dev server..."</div>
+        </div>
+        <div style="color:#444;display:flex;align-items:center;">&#8594;</div>
+        <div style="flex:1;text-align:center;padding:8px 4px;background:#152a15;border-radius:4px;">
+          <div style="color:#3fb950;font-weight:600;">T+60s</div>
+          <div style="margin-top:4px;">iframe loads</div>
+          <div style="color:#3fb950;margin-top:2px;">App appears</div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul><li>No "refused to connect" ever</li><li>Clean, professional feel</li><li>Easy to implement</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>User waits 30-60s seeing a spinner</li><li>No real-time preview of AI progress</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Both: Scaffold + Smart Loading Fallback</h3>
+      <p>Best of both worlds. <strong>Pre-scaffold the Next.js app in the Docker image</strong> so the dev server starts in ~3s. But also have a smart loading overlay that only shows briefly and disappears once the iframe actually loads. If anything goes wrong, the loading screen handles it gracefully.</p>
+      <div style="display:flex;gap:4px;font-size:11px;color:#888;margin-top:12px;">
+        <div style="flex:1;text-align:center;padding:8px 4px;background:#1a1a2e;border-radius:4px;">
+          <div style="color:#58a6ff;font-weight:600;">T+0s</div>
+          <div style="margin-top:4px;">Brief loading</div>
+          <div style="color:#58a6ff;margin-top:2px;">"Preparing..."</div>
+        </div>
+        <div style="color:#444;display:flex;align-items:center;">&#8594;</div>
+        <div style="flex:1;text-align:center;padding:8px 4px;background:#152a15;border-radius:4px;">
+          <div style="color:#3fb950;font-weight:600;">T+3s</div>
+          <div style="margin-top:4px;">Template ready</div>
+          <div style="color:#3fb950;margin-top:2px;">Preview: Default page</div>
+        </div>
+        <div style="color:#444;display:flex;align-items:center;">&#8594;</div>
+        <div style="flex:1;text-align:center;padding:8px 4px;background:#152a15;border-radius:4px;">
+          <div style="color:#3fb950;font-weight:600;">T+5s+</div>
+          <div style="margin-top:4px;">AI editing</div>
+          <div style="color:#3fb950;margin-top:2px;">Preview: Live updates</div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Fastest possible preview</li><li>Graceful fallback</li><li>Real-time AI progress visible</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>More work (template + loading)</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:20px;">My recommendation: <strong>Option C</strong> — Pre-scaffold the template so preview is near-instant, with a smart loading overlay as safety net. This completely eliminates the "refused to connect" problem.</p>

@@ -13,15 +13,44 @@ import { allocatePort } from "@/lib/port-manager";
 import { getActiveDockerVm } from "@/lib/docker-vm";
 import { getOrCreateContainer } from "@/lib/docker-manager";
 
+type LogSubscriber = (data: string) => void;
+
 type DevServerEntry = {
   projectId: string;
   containerId: string;
   execId: string | null;
   port: number;
   stream: NodeJS.ReadableStream | null;
+  logBuffer: string[];
+  logSubscribers: Set<LogSubscriber>;
 };
 
 const activeServers = new Map<string, DevServerEntry>();
+
+/**
+ * Subscribe to live dev server logs for a project.
+ * Returns existing buffered logs immediately, then streams new logs.
+ * Call the returned function to unsubscribe.
+ */
+export function subscribeToDevServerLogs(
+  projectId: string,
+  callback: LogSubscriber,
+): (() => void) | null {
+  const entry = activeServers.get(projectId);
+  if (!entry) return null;
+
+  // Send buffered logs first
+  for (const line of entry.logBuffer) {
+    callback(line);
+  }
+
+  // Subscribe to new logs
+  entry.logSubscribers.add(callback);
+
+  return () => {
+    entry.logSubscribers.delete(callback);
+  };
+}
 const docker = new Docker();
 
 // The dev server runs on port 3000 INSIDE the container
@@ -156,15 +185,6 @@ export async function startDevServer(projectId: string): Promise<{
 
   const stream = await exec.start({ hijack: true, stdin: false });
 
-  // Capture logs into the DockerVm's log buffer
-  const vm = getActiveDockerVm(projectId);
-  stream.on("data", (chunk: Buffer) => {
-    const text = chunk.toString("utf-8");
-    if (vm) {
-      vm.appendLogs(text);
-    }
-  });
-
   const inspectResult = await exec.inspect();
 
   const entry: DevServerEntry = {
@@ -173,7 +193,31 @@ export async function startDevServer(projectId: string): Promise<{
     execId: inspectResult.ID || null,
     port: hostPort,
     stream,
+    logBuffer: [],
+    logSubscribers: new Set(),
   };
+
+  // Capture logs — push to VM buffer, local buffer, and all live subscribers
+  const vm = getActiveDockerVm(projectId);
+  stream.on("data", (chunk: Buffer) => {
+    const text = chunk.toString("utf-8");
+    if (vm) {
+      vm.appendLogs(text);
+    }
+    // Buffer last 500 lines for late subscribers
+    entry.logBuffer.push(text);
+    if (entry.logBuffer.length > 500) {
+      entry.logBuffer.shift();
+    }
+    // Notify all live subscribers
+    for (const sub of entry.logSubscribers) {
+      try {
+        sub(text);
+      } catch {
+        // subscriber error — ignore
+      }
+    }
+  });
 
   activeServers.set(projectId, entry);
 
