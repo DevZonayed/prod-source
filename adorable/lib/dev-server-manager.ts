@@ -170,9 +170,26 @@ export async function startDevServer(projectId: string): Promise<{
     console.error("[DevServer] Dependency check failed:", err);
   }
 
-  // Start dev server as a long-running exec
+  // Kill any existing dev server process before starting (skip PID 1)
+  try {
+    const killExec = await container.exec({
+      Cmd: ["bash", "-c", "for p in $(grep -rlZ 'next\\|npm' /proc/[2-9]*/cmdline /proc/[1-9][0-9]*/cmdline 2>/dev/null | tr '\\0' '\\n' | grep -oP '/proc/\\K[0-9]+' | sort -un); do kill -9 $p 2>/dev/null; done; sleep 0.5; : > /tmp/dev-server.log; true"],
+      AttachStdout: true,
+      AttachStderr: true,
+    });
+    const killStream = await killExec.start({ hijack: true, stdin: false });
+    await new Promise<void>((resolve) => {
+      killStream.on("end", resolve);
+      killStream.resume();
+    });
+  } catch {
+    // Ignore kill errors
+  }
+
+  // Start dev server as a long-running exec, tee output to a log file
+  // so the browser terminal can tail it
   const exec = await container.exec({
-    Cmd: ["bash", "-c", `cd /workspace && ${devCommand}`],
+    Cmd: ["bash", "-c", `cd /workspace && ${devCommand} 2>&1 | tee /tmp/dev-server.log`],
     WorkingDir: "/workspace",
     AttachStdout: true,
     AttachStderr: true,
