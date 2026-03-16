@@ -12,7 +12,6 @@ import Docker from "dockerode";
 import { WebSocketServer, WebSocket } from "ws";
 
 import { getProject } from "./lib/local-storage";
-import { subscribeToDevServerLogs } from "./lib/dev-server-manager";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOSTNAME || "localhost";
@@ -118,45 +117,96 @@ app.prepare().then(() => {
 
     console.log(`[Terminal] Container resolved: ${resolvedContainerId ? resolvedContainerId.slice(0, 12) : 'NONE'}, path: ${project.path}`);
 
-    // ─── "Dev Server" session: stream dev server logs (read-only + interactive bash) ───
+    // ─── "Dev Server" session: run dev server in an interactive TTY ───
     if (resolvedContainerId && sessionId === "dev-server") {
       try {
         const container = docker.getContainer(resolvedContainerId);
-        const info = await container.inspect();
-        if (!info.State.Running) {
+        const containerInfo = await container.inspect();
+        if (!containerInfo.State.Running) {
           await container.start();
         }
 
-        // Try to subscribe to live dev server logs
-        const unsubscribe = subscribeToDevServerLogs(projectId, (text) => {
+        // The dev server writes to /tmp/dev-server.log inside the container.
+        // Tail that log file to stream output to the terminal.
+        // If the log doesn't exist yet (dev server hasn't started), wait for it.
+        const exec = await container.exec({
+          Cmd: [
+            "/bin/bash",
+            "-c",
+            [
+              'echo "\\033[36m▶ Dev Server Logs\\033[0m"',
+              'echo "\\033[90m─────────────────────────────────────\\033[0m"',
+              // Wait up to 30s for the log file to appear
+              'for i in $(seq 1 60); do',
+              '  if [ -f /tmp/dev-server.log ]; then break; fi',
+              '  if [ "$i" = "1" ]; then echo "\\033[33mWaiting for dev server to start...\\033[0m"; fi',
+              '  sleep 0.5',
+              'done',
+              // Use tail -F (capital F) to follow by filename, not fd.
+              // This handles log file replacement when dev server restarts.
+              'if [ -f /tmp/dev-server.log ]; then',
+              '  tail -n 50 -F /tmp/dev-server.log 2>/dev/null',
+              'else',
+              '  echo "\\033[31mDev server log not found. Opening shell...\\033[0m"',
+              '  cd /workspace && exec /bin/bash',
+              'fi',
+            ].join('\n'),
+          ],
+          AttachStdin: true,
+          AttachStdout: true,
+          AttachStderr: true,
+          Tty: true,
+          Env: ["TERM=xterm-256color"],
+        });
+
+        const stream = await exec.start({
+          hijack: true,
+          stdin: true,
+          Tty: true,
+        });
+
+        console.log(`[Terminal] Dev server terminal started for ${projectId}`);
+
+        // Container output → WebSocket
+        stream.on("data", (data: Buffer) => {
           if (ws.readyState === WebSocket.OPEN) {
-            ws.send(text);
+            ws.send(data.toString("utf-8"));
           }
         });
 
-        if (unsubscribe) {
-          // We have a live dev server — show its logs
-          console.log(`[Terminal] Subscribed to dev server logs for ${projectId}`);
+        stream.on("end", () => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send("\r\n\x1b[33mDev server process ended.\x1b[0m\r\n");
+            ws.close(1000, "session ended");
+          }
+        });
 
-          ws.on("close", () => {
-            unsubscribe();
-          });
-          ws.on("error", () => {
-            unsubscribe();
-          });
+        stream.on("error", (err: Error) => {
+          console.error(`[Terminal] Dev server stream error:`, err.message);
+        });
 
-          // Ignore most input (logs are read-only), but handle resize
-          ws.on("message", () => {
-            // Dev server log view is read-only
-          });
+        // WebSocket input → container (Ctrl+C to stop, etc.)
+        ws.on("message", (rawData: Buffer | string) => {
+          const message = typeof rawData === "string" ? rawData : rawData.toString("utf-8");
+          if (message.startsWith("{")) {
+            try {
+              const parsed = JSON.parse(message);
+              if (parsed.type === "resize" && parsed.cols && parsed.rows) {
+                exec.resize({ h: parsed.rows, w: parsed.cols }).catch(() => {});
+                return;
+              }
+            } catch {
+              // Not JSON
+            }
+          }
+          stream.write(message);
+        });
 
-          return;
-        }
-
-        // No active dev server yet — fall through to interactive bash
-        console.log(`[Terminal] No active dev server for ${projectId}, opening bash`);
+        ws.on("close", () => stream.end());
+        ws.on("error", () => stream.end());
+        return;
       } catch (error) {
-        console.error("[Terminal] Dev server log subscription failed:", error);
+        console.error("[Terminal] Dev server terminal failed:", error);
         // Fall through to interactive bash
       }
     }

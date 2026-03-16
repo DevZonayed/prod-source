@@ -802,7 +802,7 @@ function RightPanel({
               >
                 {containerReady ? (
                   <XTerminal
-                    key={tab.sessionId === "dev-server" ? `dev-${devServerRunning}` : tab.id}
+                    key={tab.id}
                     projectId={repoId}
                     sessionId={tab.sessionId}
                     className="h-full w-full"
