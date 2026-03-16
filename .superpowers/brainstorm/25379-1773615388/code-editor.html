@@ -1,0 +1,64 @@
+<h2>Code Editor: Which editor library should we use?</h2>
+<p class="subtitle">We need a web-based code editor with syntax highlighting, file tabs, and a file explorer. Three main options exist.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Monaco Editor (VS Code's engine)</h3>
+      <p>The exact same editor that powers VS Code. Full IntelliSense, multi-cursor, minimap, find & replace, code folding, bracket matching — everything users expect from VS Code.</p>
+      <div style="margin-top:12px;background:#1e1e1e;border-radius:8px;padding:16px;font-family:monospace;font-size:12px;">
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <span style="color:#569cd6;">export</span>
+          <span style="color:#569cd6;">default</span>
+          <span style="color:#569cd6;">function</span>
+          <span style="color:#dcdcaa;">Home</span>
+          <span style="color:#d4d4d4;">() {</span>
+        </div>
+        <div style="margin-left:16px;">
+          <span style="color:#c586c0;">return</span>
+          <span style="color:#d4d4d4;"> (</span>
+        </div>
+        <div style="margin-left:24px;">
+          <span style="color:#808080;">&lt;</span><span style="color:#569cd6;">main</span>
+          <span style="color:#9cdcfe;"> className</span><span style="color:#d4d4d4;">=</span><span style="color:#ce9178;">"flex min-h-screen"</span><span style="color:#808080;">&gt;</span>
+        </div>
+        <div style="margin-left:32px;">
+          <span style="color:#808080;">&lt;</span><span style="color:#4ec9b0;">Header</span>
+          <span style="color:#808080;"> /&gt;</span>
+        </div>
+        <div style="color:#444;font-size:10px;margin-top:8px;text-align:right;">minimap &#x2022; IntelliSense &#x2022; multi-cursor &#x2022; code folding</div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Identical to VS Code — users already know it</li><li>Full TypeScript/JSX support built-in</li><li>Best autocomplete & error highlighting</li><li>Used by StackBlitz, CodeSandbox, GitHub.dev</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Large bundle (~2-4MB)</li><li>Can be heavy on low-end devices</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>CodeMirror 6</h3>
+      <p>Modern, lightweight, extensible editor. Used by Replit, Observable, and many modern web apps. Good TypeScript support via extensions.</p>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Lightweight (~500KB)</li><li>Very fast, even on mobile</li><li>Highly extensible</li><li>Better accessibility</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Less VS Code-familiar</li><li>TypeScript support requires extra setup</li><li>No built-in IntelliSense</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Shiki (Read-only) + Simple Edit</h3>
+      <p>Not a full editor — just beautiful syntax-highlighted code display with basic edit capabilities. Minimal weight, great for viewing AI-generated code. Users can make small edits but it's not a full IDE.</p>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Tiny bundle (~100KB)</li><li>Beautiful VS Code-quality highlighting</li><li>Fastest to load</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Not a real editor — limited editing</li><li>No autocomplete, no error highlighting</li><li>Would need to build editing features</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:20px;">My recommendation: <strong>Option A (Monaco)</strong> — You specifically asked for "VS Code in the web." Monaco IS VS Code's editor. It's the industry standard for AI app builders (StackBlitz, CodeSandbox, Bolt.new all use it). The bundle size is acceptable for a dev tool.</p>

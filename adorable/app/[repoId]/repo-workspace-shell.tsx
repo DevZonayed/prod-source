@@ -494,21 +494,12 @@ export function RepoWorkspaceShell({
               )}
             >
               {showWorkspacePanel && repoId && (
-                <>
-                  {rightPanelView === "code" ? (
-                    <div className="flex h-full flex-col overflow-hidden p-2 pl-0">
-                      <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-border/50">
-                        <CodeEditor projectId={repoId} />
-                      </div>
-                    </div>
-                  ) : (
-                    <AppPreview
-                      metadata={selectedRepo?.vm ?? null}
-                      iframeRef={iframeRef}
-                      repoId={repoId}
-                    />
-                  )}
-                </>
+                <RightPanel
+                  repoId={repoId}
+                  metadata={selectedRepo?.vm ?? null}
+                  iframeRef={iframeRef}
+                  rightPanelView={rightPanelView}
+                />
               )}
             </div>
           </div>
@@ -623,14 +614,16 @@ function PreviewPlaceholder() {
   );
 }
 
-function AppPreview({
+function RightPanel({
+  repoId,
   metadata,
   iframeRef,
-  repoId,
+  rightPanelView,
 }: {
+  repoId: string;
   metadata: RepoVmInfo | null;
   iframeRef: React.RefObject<HTMLIFrameElement | null>;
-  repoId: string;
+  rightPanelView: "code" | "preview";
 }) {
   const [extraTerminals, setExtraTerminals] = useState<TerminalTab[]>([]);
   const [activeTab, setActiveTab] = useState("dev-server");
@@ -638,12 +631,10 @@ function AppPreview({
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
 
-  // Auto-create container, then start dev server once container is ready
+  // Container & dev server hooks — shared between Code and Preview
   const { containerReady, loading: containerLoading, error: containerError } = useContainer(repoId);
-  const { previewUrl: livePreviewUrl, running: devServerRunning, loading: devServerLoading, error: devServerError } = useDevServer(repoId, containerReady);
+  const { previewUrl: livePreviewUrl, running: devServerRunning, loading: devServerLoading } = useDevServer(repoId, containerReady);
 
-  // Use live URL from dev-server-manager, or fall back to metadata
-  // Filter out placeholder URLs (the app's own port is not a valid preview)
   const metadataUrl = metadata?.previewUrl || null;
   const isPlaceholder = metadataUrl && (metadataUrl.includes(`:${3000}`) || metadataUrl.includes(`:${4000}`));
   const effectivePreviewUrl = livePreviewUrl || (isPlaceholder ? null : metadataUrl);
@@ -688,31 +679,44 @@ function AppPreview({
 
   return (
     <div className="flex h-full flex-col overflow-hidden p-2 pl-0">
-      {/* Preview pane */}
+      {/* Content area — Code or Preview */}
       <div
         className="relative flex min-h-0 flex-col overflow-hidden rounded-xl border border-border/50 bg-background transition-all duration-300"
         style={{ flex: terminalOpen ? "1 1 65%" : "1 1 100%" }}
       >
-        {/* Loading overlay — never shows "refused to connect" */}
-        <PreviewLoadingOverlay
-          containerLoading={containerLoading}
-          devServerLoading={devServerLoading || !effectivePreviewUrl}
-          visible={!iframeLoaded}
-        />
-        {effectivePreviewUrl && (
-          <iframe
-            ref={iframeRef}
-            src={effectivePreviewUrl}
-            className={cn(
-              "h-full w-full rounded-xl transition-opacity duration-500",
-              iframeLoaded && !devServerLoading ? "opacity-100" : "opacity-0",
-            )}
-            onLoad={() => setIframeLoaded(true)}
+        {/* Preview view */}
+        <div
+          className="absolute inset-0 flex flex-col"
+          style={{ display: rightPanelView === "preview" ? "flex" : "none" }}
+        >
+          <PreviewLoadingOverlay
+            containerLoading={containerLoading}
+            devServerLoading={devServerLoading || !effectivePreviewUrl || !devServerRunning}
+            visible={!iframeLoaded || !devServerRunning}
           />
-        )}
+          {effectivePreviewUrl && devServerRunning && (
+            <iframe
+              ref={iframeRef}
+              src={effectivePreviewUrl}
+              className={cn(
+                "h-full w-full rounded-xl transition-opacity duration-500",
+                iframeLoaded ? "opacity-100" : "opacity-0",
+              )}
+              onLoad={() => setIframeLoaded(true)}
+            />
+          )}
+        </div>
+
+        {/* Code view */}
+        <div
+          className="absolute inset-0"
+          style={{ display: rightPanelView === "code" ? "block" : "none" }}
+        >
+          <CodeEditor projectId={repoId} />
+        </div>
       </div>
 
-      {/* Terminal panel */}
+      {/* Terminal panel — shared between Code and Preview */}
       <div
         className={cn(
           "flex flex-col overflow-hidden rounded-xl border border-border/50 transition-all duration-300 ease-in-out",
@@ -721,7 +725,6 @@ function AppPreview({
       >
         {/* Terminal header / tab bar */}
         <div className="flex shrink-0 items-center gap-0 bg-[rgb(35,35,35)] px-1">
-          {/* Toggle button */}
           <button
             type="button"
             onClick={() => setTerminalOpen((v) => !v)}
@@ -799,6 +802,7 @@ function AppPreview({
               >
                 {containerReady ? (
                   <XTerminal
+                    key={tab.sessionId === "dev-server" ? `dev-${devServerRunning}` : tab.id}
                     projectId={repoId}
                     sessionId={tab.sessionId}
                     className="h-full w-full"
@@ -810,11 +814,6 @@ function AppPreview({
                 )}
               </div>
             ))}
-            {allTabs.length === 0 && (
-              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                No terminal selected
-              </div>
-            )}
           </div>
         )}
       </div>

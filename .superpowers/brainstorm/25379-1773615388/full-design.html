@@ -1,0 +1,250 @@
+<h2>Full Design: Code Editor + Preview System</h2>
+<p class="subtitle">Here's the complete design based on all your choices. Review each section and let me know if it looks right.</p>
+
+<div class="section">
+  <h3>1. Workspace Layout</h3>
+  <div class="mockup">
+    <div class="mockup-header">Desktop Layout: Chat | Code/Preview Toggle + Terminal</div>
+    <div class="mockup-body" style="display:flex;gap:0;height:400px;">
+      <!-- Chat Panel -->
+      <div style="flex:2;background:#1a1a2e;border-right:1px solid #333;display:flex;flex-direction:column;">
+        <div style="padding:8px 12px;background:#151525;border-bottom:1px solid #333;display:flex;align-items:center;gap:8px;">
+          <span style="color:#888;font-size:11px;">&#8592; All Conversations</span>
+        </div>
+        <div style="flex:1;padding:12px;display:flex;flex-direction:column;gap:8px;overflow:hidden;">
+          <div style="background:#252540;border-radius:8px;padding:8px;color:#aaa;font-size:11px;">Build me a todo app with dark theme</div>
+          <div style="background:#1e3a5f;border-radius:8px;padding:8px;color:#8cb4e0;font-size:11px;">Creating your Next.js app with a dark-themed todo list...</div>
+          <div style="background:#1e3a5f;border-radius:8px;padding:8px;font-size:10px;">
+            <div style="color:#58a6ff;margin-bottom:4px;">&#128196; Writing page.tsx</div>
+            <div style="color:#58a6ff;">&#128196; Writing components/todo-list.tsx</div>
+          </div>
+        </div>
+        <div style="padding:8px 12px;border-top:1px solid #333;">
+          <div style="background:#252540;border-radius:6px;padding:8px;color:#666;font-size:11px;">Type a message...</div>
+        </div>
+      </div>
+
+      <!-- Right Panel -->
+      <div style="flex:3;display:flex;flex-direction:column;">
+        <!-- Tab Toggle Bar -->
+        <div style="padding:6px 12px;background:#151525;border-bottom:1px solid #333;display:flex;align-items:center;gap:8px;">
+          <div style="display:flex;background:#111;border-radius:6px;padding:2px;gap:2px;">
+            <div style="padding:4px 16px;background:#333;border-radius:4px;color:#fff;font-size:11px;font-weight:600;">&#128196; Code</div>
+            <div style="padding:4px 16px;color:#666;font-size:11px;">&#127760; Preview</div>
+          </div>
+          <div style="flex:1;"></div>
+          <div style="color:#888;font-size:10px;">&#128259; Publish</div>
+        </div>
+
+        <!-- Code Editor View (active) -->
+        <div style="flex:1;display:flex;min-height:0;">
+          <!-- File Sidebar -->
+          <div style="width:170px;background:#252526;border-right:1px solid #333;padding:6px;font-size:10px;overflow:hidden;">
+            <div style="color:#888;text-transform:uppercase;font-size:8px;letter-spacing:1px;margin-bottom:6px;padding:2px;">Explorer</div>
+            <div style="color:#ccc;padding:2px 4px;">&#9660; <span style="color:#dcb67a;">app</span></div>
+            <div style="color:#fff;padding:2px 4px 2px 16px;background:#094771;border-radius:2px;">page.tsx</div>
+            <div style="color:#999;padding:2px 4px 2px 16px;">layout.tsx</div>
+            <div style="color:#999;padding:2px 4px 2px 16px;">globals.css</div>
+            <div style="color:#ccc;padding:2px 4px;">&#9660; <span style="color:#dcb67a;">components</span></div>
+            <div style="color:#e8ab53;padding:2px 4px 2px 16px;">todo-list.tsx <span style="font-size:8px;">&#9679;</span></div>
+            <div style="color:#999;padding:2px 4px 2px 16px;">todo-item.tsx</div>
+            <div style="color:#ccc;padding:2px 4px;">&#9654; <span style="color:#dcb67a;">lib</span></div>
+            <div style="color:#999;padding:2px 4px;">package.json</div>
+            <div style="color:#999;padding:2px 4px;">tailwind.config.ts</div>
+            <div style="color:#999;padding:2px 4px;">tsconfig.json</div>
+          </div>
+          <!-- Monaco Editor -->
+          <div style="flex:1;background:#1e1e1e;display:flex;flex-direction:column;">
+            <div style="display:flex;gap:0;background:#252526;">
+              <div style="padding:4px 12px;border-top:2px solid #007acc;color:#fff;font-size:10px;background:#1e1e1e;">page.tsx &#x2715;</div>
+              <div style="padding:4px 12px;color:#888;font-size:10px;background:#2d2d2d;">layout.tsx &#x2715;</div>
+              <div style="padding:4px 12px;color:#e8ab53;font-size:10px;background:#2d2d2d;">todo-list.tsx &#9679; &#x2715;</div>
+            </div>
+            <div style="flex:1;padding:12px;font-family:monospace;font-size:11px;line-height:1.6;">
+              <div><span style="color:#888;margin-right:12px;font-size:9px;"> 1</span><span style="color:#569cd6;">import</span> <span style="color:#9cdcfe;">TodoList</span> <span style="color:#569cd6;">from</span> <span style="color:#ce9178;">"./components/todo-list"</span></div>
+              <div><span style="color:#888;margin-right:12px;font-size:9px;"> 2</span></div>
+              <div><span style="color:#888;margin-right:12px;font-size:9px;"> 3</span><span style="color:#569cd6;">export default function</span> <span style="color:#dcdcaa;">Home</span><span style="color:#d4d4d4;">() {</span></div>
+              <div><span style="color:#888;margin-right:12px;font-size:9px;"> 4</span><span style="color:#d4d4d4;">  </span><span style="color:#c586c0;">return</span> <span style="color:#d4d4d4;">(</span></div>
+              <div style="background:#0d2818;border-left:2px solid #3fb950;padding-left:4px;"><span style="color:#888;margin-right:12px;font-size:9px;"> 5</span><span style="color:#d4d4d4;">    </span><span style="color:#808080;">&lt;</span><span style="color:#569cd6;">main</span> <span style="color:#9cdcfe;">className</span><span style="color:#d4d4d4;">=</span><span style="color:#ce9178;">"min-h-screen bg-zinc-950"</span><span style="color:#808080;">&gt;</span></div>
+              <div style="background:#0d2818;border-left:2px solid #3fb950;padding-left:4px;"><span style="color:#888;margin-right:12px;font-size:9px;"> 6</span><span style="color:#d4d4d4;">      </span><span style="color:#808080;">&lt;</span><span style="color:#4ec9b0;">TodoList</span> <span style="color:#808080;">/&gt;</span></div>
+              <div><span style="color:#888;margin-right:12px;font-size:9px;"> 7</span><span style="color:#d4d4d4;">    </span><span style="color:#808080;">&lt;/</span><span style="color:#569cd6;">main</span><span style="color:#808080;">&gt;</span></div>
+              <div><span style="color:#888;margin-right:12px;font-size:9px;"> 8</span><span style="color:#d4d4d4;">  )</span></div>
+              <div><span style="color:#888;margin-right:12px;font-size:9px;"> 9</span><span style="color:#d4d4d4;">}</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Terminal -->
+        <div style="height:80px;background:#0d1117;border-top:1px solid #333;padding:8px;font-family:monospace;font-size:10px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <span style="color:#888;font-size:9px;text-transform:uppercase;">Terminal</span>
+            <span style="color:#555;">|</span>
+            <span style="color:#58a6ff;font-size:9px;">Dev Server</span>
+            <span style="color:#555;font-size:9px;">Extra</span>
+            <span style="color:#555;font-size:9px;">+</span>
+          </div>
+          <div style="color:#3fb950;">&#10003; Ready on http://localhost:3000</div>
+          <div style="color:#888;">&#9675; Compiling /page ...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <h3>2. Preview Startup Flow (No more "refused to connect")</h3>
+  <div style="background:#1a1a2e;border-radius:8px;padding:16px;">
+    <div style="display:flex;gap:6px;font-size:11px;">
+      <div style="flex:1;text-align:center;padding:12px 6px;background:#1e1e2e;border-radius:6px;border:1px solid #333;">
+        <div style="font-size:20px;margin-bottom:4px;">&#128230;</div>
+        <div style="color:#58a6ff;font-weight:600;">Step 1</div>
+        <div style="color:#aaa;margin-top:4px;">Docker image has pre-built Next.js template with node_modules</div>
+        <div style="color:#666;margin-top:2px;font-size:10px;">No npm install needed</div>
+      </div>
+      <div style="display:flex;align-items:center;color:#444;">&#8594;</div>
+      <div style="flex:1;text-align:center;padding:12px 6px;background:#1e1e2e;border-radius:6px;border:1px solid #333;">
+        <div style="font-size:20px;margin-bottom:4px;">&#9889;</div>
+        <div style="color:#e8ab53;font-weight:600;">Step 2</div>
+        <div style="color:#aaa;margin-top:4px;">Container starts, template copied to /workspace, dev server launches</div>
+        <div style="color:#666;margin-top:2px;font-size:10px;">~3 seconds</div>
+      </div>
+      <div style="display:flex;align-items:center;color:#444;">&#8594;</div>
+      <div style="flex:1;text-align:center;padding:12px 6px;background:#152a15;border-radius:6px;border:1px solid #3fb950;">
+        <div style="font-size:20px;margin-bottom:4px;">&#127760;</div>
+        <div style="color:#3fb950;font-weight:600;">Step 3</div>
+        <div style="color:#aaa;margin-top:4px;">Preview shows default Next.js page immediately</div>
+        <div style="color:#3fb950;margin-top:2px;font-size:10px;">User sees a working app!</div>
+      </div>
+      <div style="display:flex;align-items:center;color:#444;">&#8594;</div>
+      <div style="flex:1;text-align:center;padding:12px 6px;background:#152a15;border-radius:6px;border:1px solid #3fb950;">
+        <div style="font-size:20px;margin-bottom:4px;">&#129302;</div>
+        <div style="color:#3fb950;font-weight:600;">Step 4</div>
+        <div style="color:#aaa;margin-top:4px;">AI modifies files, Next.js hot-reloads, preview updates live</div>
+        <div style="color:#3fb950;margin-top:2px;font-size:10px;">Real-time updates</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <h3>3. Smart Loading Overlay (safety net)</h3>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">Loading State (brief, ~3s)</div>
+      <div class="mockup-body" style="height:200px;display:flex;align-items:center;justify-content:center;background:#0d1117;">
+        <div style="text-align:center;">
+          <div style="width:40px;height:40px;border:3px solid #333;border-top:3px solid #58a6ff;border-radius:50%;margin:0 auto 12px;"></div>
+          <div style="color:#fff;font-size:14px;font-weight:600;">Preparing your app</div>
+          <div style="color:#888;font-size:11px;margin-top:4px;">Starting dev server...</div>
+          <div style="background:#222;border-radius:4px;height:4px;width:200px;margin:12px auto 0;">
+            <div style="background:#58a6ff;border-radius:4px;height:4px;width:60%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">Ready State (replaces loading)</div>
+      <div class="mockup-body" style="height:200px;background:#fff;display:flex;flex-direction:column;">
+        <div style="padding:16px;text-align:center;">
+          <div style="font-size:28px;color:#000;">&#9758; My Todo App</div>
+          <div style="color:#666;font-size:12px;margin-top:4px;">Built with Next.js</div>
+        </div>
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;">
+          <div style="color:#888;font-size:12px;">Live preview content here</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <h3>4. AI &#8594; Editor Sync</h3>
+  <div style="background:#1a1a2e;border-radius:8px;padding:16px;">
+    <div style="display:flex;gap:12px;font-size:11px;">
+      <div style="flex:1;padding:12px;background:#1e1e2e;border-radius:6px;border:1px solid #333;">
+        <div style="color:#58a6ff;font-weight:600;margin-bottom:8px;">When AI writes a file:</div>
+        <ul style="color:#aaa;margin:0;padding-left:16px;line-height:1.8;">
+          <li>File opens automatically as a new tab</li>
+          <li>Editor switches to that file</li>
+          <li>Content appears in real-time</li>
+          <li>Green highlight on new/changed lines</li>
+          <li>File tree shows the new file</li>
+        </ul>
+      </div>
+      <div style="flex:1;padding:12px;background:#1e1e2e;border-radius:6px;border:1px solid #333;">
+        <div style="color:#e8ab53;font-weight:600;margin-bottom:8px;">When AI modifies a file:</div>
+        <ul style="color:#aaa;margin:0;padding-left:16px;line-height:1.8;">
+          <li>If tab exists, content updates live</li>
+          <li>If no tab, opens a new one</li>
+          <li>Changed lines highlighted in green</li>
+          <li>Scroll follows the changes</li>
+          <li>Preview hot-reloads simultaneously</li>
+        </ul>
+      </div>
+      <div style="flex:1;padding:12px;background:#1e1e2e;border-radius:6px;border:1px solid #333;">
+        <div style="color:#3fb950;font-weight:600;margin-bottom:8px;">User can also edit:</div>
+        <ul style="color:#aaa;margin:0;padding-left:16px;line-height:1.8;">
+          <li>Full Monaco editing (type, paste, etc.)</li>
+          <li>Changes save to container filesystem</li>
+          <li>Next.js hot-reloads on save</li>
+          <li>Ctrl+S to save (auto-save optional)</li>
+          <li>User edits persist across sessions</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <h3>5. Component Architecture</h3>
+  <div style="background:#1a1a2e;border-radius:8px;padding:16px;font-size:11px;">
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div style="color:#888;text-transform:uppercase;font-size:9px;letter-spacing:1px;">New Components</div>
+      <div style="display:flex;gap:8px;">
+        <div style="flex:1;padding:10px;background:#1e1e2e;border-radius:6px;border:1px solid #007acc;">
+          <div style="color:#007acc;font-weight:600;">CodeEditor</div>
+          <div style="color:#888;margin-top:4px;">Monaco editor wrapper. Manages tabs, content sync with container filesystem, AI write events.</div>
+        </div>
+        <div style="flex:1;padding:10px;background:#1e1e2e;border-radius:6px;border:1px solid #007acc;">
+          <div style="color:#007acc;font-weight:600;">FileExplorer</div>
+          <div style="color:#888;margin-top:4px;">Tree view sidebar. Reads file list from container via API. Supports expand/collapse, file icons, click-to-open.</div>
+        </div>
+        <div style="flex:1;padding:10px;background:#1e1e2e;border-radius:6px;border:1px solid #007acc;">
+          <div style="color:#007acc;font-weight:600;">EditorTabs</div>
+          <div style="color:#888;margin-top:4px;">Tab bar for open files. Close tabs, reorder, show modified indicator. Active tab highlighted.</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <div style="flex:1;padding:10px;background:#1e1e2e;border-radius:6px;border:1px solid #e8ab53;">
+          <div style="color:#e8ab53;font-weight:600;">useFileSystem (hook)</div>
+          <div style="color:#888;margin-top:4px;">Reads/writes files via container API. Lists directory tree. Watches for AI file changes via custom events.</div>
+        </div>
+        <div style="flex:1;padding:10px;background:#1e1e2e;border-radius:6px;border:1px solid #e8ab53;">
+          <div style="color:#e8ab53;font-weight:600;">useEditorSync (hook)</div>
+          <div style="color:#888;margin-top:4px;">Bridges AI tool calls (writeFile, replaceInFile) to Monaco editor. Opens tabs, updates content, highlights changes.</div>
+        </div>
+        <div style="flex:1;padding:10px;background:#1e1e2e;border-radius:6px;border:1px solid #e8ab53;">
+          <div style="color:#e8ab53;font-weight:600;">PreviewLoadingOverlay</div>
+          <div style="color:#888;margin-top:4px;">Smart loading screen. Shows status steps. Hides when iframe loads. Never shows "refused to connect".</div>
+        </div>
+      </div>
+      <div style="color:#888;text-transform:uppercase;font-size:9px;letter-spacing:1px;margin-top:8px;">Modified Components</div>
+      <div style="display:flex;gap:8px;">
+        <div style="flex:1;padding:10px;background:#1e1e2e;border-radius:6px;border:1px solid #555;">
+          <div style="color:#aaa;font-weight:600;">RepoWorkspaceShell</div>
+          <div style="color:#888;margin-top:4px;">Add Code/Preview tab toggle. Integrate CodeEditor. Keep terminal at bottom.</div>
+        </div>
+        <div style="flex:1;padding:10px;background:#1e1e2e;border-radius:6px;border:1px solid #555;">
+          <div style="color:#aaa;font-weight:600;">Docker Image</div>
+          <div style="color:#888;margin-top:4px;">Bake in Next.js template with pre-installed node_modules. Copy to /workspace on container start.</div>
+        </div>
+        <div style="flex:1;padding:10px;background:#1e1e2e;border-radius:6px;border:1px solid #555;">
+          <div style="color:#aaa;font-weight:600;">dev-server-manager</div>
+          <div style="color:#888;margin-top:4px;">Skip npm install when template detected. Faster startup path.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:24px;padding:12px;background:#152a15;border-radius:8px;border:1px solid #3fb950;color:#3fb950;">Does this design look right? Let me know if you want to change anything, or if we should proceed to writing the implementation plan.</p>

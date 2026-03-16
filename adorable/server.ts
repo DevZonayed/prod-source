@@ -11,6 +11,9 @@ import next from "next";
 import Docker from "dockerode";
 import { WebSocketServer, WebSocket } from "ws";
 
+import { getProject } from "./lib/local-storage";
+import { subscribeToDevServerLogs } from "./lib/dev-server-manager";
+
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOSTNAME || "localhost";
 const port = parseInt(process.env.PORT || "3000", 10);
@@ -19,21 +22,30 @@ const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 const docker = new Docker();
 
-// Lazy-load project lookup
-async function getProjectRecord(
+function getProjectRecord(
   projectId: string,
-): Promise<{ path: string; containerId: string | null } | null> {
+): { path: string; containerId: string | null } | null {
   try {
-    const { getProject } = await import("./lib/local-storage");
     const project = getProject(projectId);
     if (!project) return null;
     return { path: project.path, containerId: project.containerId };
-  } catch {
+  } catch (err) {
+    console.error("[Terminal] Failed to load project record:", err);
     return null;
   }
 }
 
 app.prepare().then(() => {
+  // Get Next.js upgrade handler so we can forward non-terminal upgrades
+  // (HMR, etc.) to it. We handle all upgrades ourselves to prevent Next.js
+  // from also registering its own upgrade listener that would conflict with
+  // our terminal WebSocket connections.
+  const nextUpgradeHandler = app.getUpgradeHandler();
+
+  // Prevent Next.js from registering a duplicate upgrade handler on first
+  // HTTP request (setupWebSocketHandler checks this flag).
+  (app as unknown as { didWebSocketSetup: boolean }).didWebSocketSetup = true;
+
   const server = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url!, true);
@@ -55,11 +67,13 @@ app.prepare().then(() => {
       wss.handleUpgrade(request, socket, head, (ws) => {
         wss.emit("connection", ws, request);
       });
+    } else {
+      // Pass non-terminal upgrades (HMR, etc.) to Next.js
+      nextUpgradeHandler(request, socket, head);
     }
-    // Other upgrades (HMR) handled by Next.js
   });
 
-  wss.on("connection", async (ws: WebSocket, request) => {
+  wss.on("connection", (ws: WebSocket, request) => {
     const url = new URL(
       request.url || "/",
       `http://${hostname}:${port}`,
@@ -67,27 +81,91 @@ app.prepare().then(() => {
     const projectId = url.searchParams.get("projectId");
     const sessionId = url.searchParams.get("session") || "default";
 
+    // Wrap the entire handler in a promise to catch all async errors
+    void (async () => {
+    console.log(`[Terminal] Connection for project=${projectId} session=${sessionId}`);
+
     if (!projectId) {
       ws.send("\r\n\x1b[31mError: projectId is required\x1b[0m\r\n");
-      ws.close();
+      ws.close(1000, "projectId required");
       return;
     }
 
-    const project = await getProjectRecord(projectId);
+    const project = getProjectRecord(projectId);
     if (!project) {
       ws.send(
         `\r\n\x1b[31mError: Project ${projectId} not found\x1b[0m\r\n`,
       );
-      ws.close();
+      ws.close(1000, "project not found");
       return;
     }
 
-    // ─── Docker container terminal ───
-    if (project.containerId) {
+    // ─── Resolve container: by ID from DB, or by name convention ───
+    let resolvedContainerId = project.containerId;
+    if (!resolvedContainerId) {
+      // Container might exist but DB hasn't been updated yet — try by name
+      const containerName = `voxel-${projectId.slice(0, 12)}`;
       try {
-        const container = docker.getContainer(project.containerId);
+        const c = docker.getContainer(containerName);
+        const info = await c.inspect();
+        if (info.State.Running) {
+          resolvedContainerId = info.Id;
+        }
+      } catch {
+        // Container doesn't exist by name either
+      }
+    }
 
-        // Verify container is running
+    console.log(`[Terminal] Container resolved: ${resolvedContainerId ? resolvedContainerId.slice(0, 12) : 'NONE'}, path: ${project.path}`);
+
+    // ─── "Dev Server" session: stream dev server logs (read-only + interactive bash) ───
+    if (resolvedContainerId && sessionId === "dev-server") {
+      try {
+        const container = docker.getContainer(resolvedContainerId);
+        const info = await container.inspect();
+        if (!info.State.Running) {
+          await container.start();
+        }
+
+        // Try to subscribe to live dev server logs
+        const unsubscribe = subscribeToDevServerLogs(projectId, (text) => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(text);
+          }
+        });
+
+        if (unsubscribe) {
+          // We have a live dev server — show its logs
+          console.log(`[Terminal] Subscribed to dev server logs for ${projectId}`);
+
+          ws.on("close", () => {
+            unsubscribe();
+          });
+          ws.on("error", () => {
+            unsubscribe();
+          });
+
+          // Ignore most input (logs are read-only), but handle resize
+          ws.on("message", () => {
+            // Dev server log view is read-only
+          });
+
+          return;
+        }
+
+        // No active dev server yet — fall through to interactive bash
+        console.log(`[Terminal] No active dev server for ${projectId}, opening bash`);
+      } catch (error) {
+        console.error("[Terminal] Dev server log subscription failed:", error);
+        // Fall through to interactive bash
+      }
+    }
+
+    // ─── Docker container interactive terminal ───
+    if (resolvedContainerId) {
+      try {
+        const container = docker.getContainer(resolvedContainerId);
+
         const info = await container.inspect();
         if (!info.State.Running) {
           await container.start();
@@ -108,10 +186,13 @@ app.prepare().then(() => {
           Tty: true,
         });
 
-        // Container output → WebSocket
+        // Send initial cd to workspace
+        stream.write("cd /workspace && clear\n");
+
+        // Container output → WebSocket (send as string, not binary)
         stream.on("data", (data: Buffer) => {
           if (ws.readyState === WebSocket.OPEN) {
-            ws.send(data);
+            ws.send(data.toString("utf-8"));
           }
         });
 
@@ -120,32 +201,39 @@ app.prepare().then(() => {
             ws.send(
               "\r\n\x1b[33mContainer session ended.\x1b[0m\r\n",
             );
-            ws.close();
+            ws.close(1000, "session ended");
           }
         });
 
-        // WebSocket input → container
-        ws.on("message", (data: Buffer | string) => {
-          const message = data.toString();
+        stream.on("error", (err: Error) => {
+          console.error(`[Terminal] Docker stream error:`, err.message);
+        });
 
-          // Handle resize messages
-          try {
-            const parsed = JSON.parse(message);
-            if (
-              parsed.type === "resize" &&
-              parsed.cols &&
-              parsed.rows
-            ) {
-              exec.resize({ h: parsed.rows, w: parsed.cols }).catch(
-                () => {},
-              );
-              return;
+        // WebSocket input → container
+        ws.on("message", (rawData: Buffer | string) => {
+          const message = typeof rawData === "string" ? rawData : rawData.toString("utf-8");
+
+          // Handle resize messages (JSON)
+          if (message.startsWith("{")) {
+            try {
+              const parsed = JSON.parse(message);
+              if (
+                parsed.type === "resize" &&
+                parsed.cols &&
+                parsed.rows
+              ) {
+                exec.resize({ h: parsed.rows, w: parsed.cols }).catch(
+                  () => {},
+                );
+                return;
+              }
+            } catch {
+              // Not valid JSON — treat as terminal input
             }
-          } catch {
-            // Not JSON — regular terminal input
           }
 
-          stream.write(data);
+          // Write terminal input to container stdin
+          stream.write(message);
         });
 
         ws.on("close", () => {
@@ -162,6 +250,8 @@ app.prepare().then(() => {
         ws.send(
           `\r\n\x1b[31mDocker terminal failed: ${error instanceof Error ? error.message : "Unknown error"}\x1b[0m\r\n`,
         );
+        ws.close(1000, "docker exec failed");
+        return;
       }
     }
 
@@ -214,8 +304,17 @@ app.prepare().then(() => {
       ws.send(
         `\r\n\x1b[31mTerminal unavailable: ${error instanceof Error ? error.message : "Unknown error"}\x1b[0m\r\n`,
       );
-      ws.close();
+      ws.close(1000, "terminal unavailable");
     }
+    })().catch((err) => {
+      console.error("[Terminal] Unhandled error in WebSocket handler:", err);
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(
+          `\r\n\x1b[31mTerminal error: ${err instanceof Error ? err.message : "Unknown error"}\x1b[0m\r\n`,
+        );
+        ws.close(1000, "terminal error");
+      }
+    });
   });
 
   server.listen(port, () => {
