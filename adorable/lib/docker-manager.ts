@@ -5,7 +5,7 @@ import * as fs from "fs";
 const docker = new Docker();
 const SANDBOX_IMAGE = "voxel-sandbox:latest";
 const CONTAINER_PREFIX = "voxel-";
-const EXPECTED_IMAGE_VERSION = "2";
+const EXPECTED_IMAGE_VERSION = "3";
 
 /**
  * Check if Docker is available.
@@ -56,7 +56,7 @@ export async function ensureSandboxImage(): Promise<void> {
   const stream = await docker.buildImage(
     {
       context: contextDir,
-      src: ["Dockerfile.sandbox"],
+      src: ["."],
     },
     {
       t: SANDBOX_IMAGE,
@@ -96,14 +96,11 @@ export async function createProjectContainer(
 ): Promise<string> {
   const containerName = `${CONTAINER_PREFIX}${projectId.slice(0, 12)}`;
 
-  // Remove existing container with same name if any
+  // Remove existing container with same name if any (force to handle any state)
   try {
     const existing = docker.getContainer(containerName);
-    const info = await existing.inspect();
-    if (info.State.Running) {
-      await existing.stop();
-    }
-    await existing.remove();
+    await existing.remove({ force: true });
+    console.log(`[Docker] Removed old container ${containerName}`);
   } catch {
     // Container doesn't exist, that's fine
   }
@@ -120,8 +117,8 @@ export async function createProjectContainer(
       },
       Memory: 2 * 1024 * 1024 * 1024, // 2GB
       CpuShares: 512,
-      // Security: drop dangerous capabilities
-      CapDrop: ["SYS_ADMIN", "NET_RAW"],
+      // Security: drop dangerous capabilities (keep SYS_ADMIN for PTY allocation in docker exec)
+      CapDrop: ["NET_RAW"],
     },
     ExposedPorts: {
       "3000/tcp": {},
@@ -137,6 +134,46 @@ export async function createProjectContainer(
   console.log(
     `[Docker] Container ${containerName} started for project ${projectId}`,
   );
+
+  // Scaffold template if workspace is empty (new project)
+  try {
+    const checkExec = await container.exec({
+      Cmd: ["test", "-f", "/workspace/package.json"],
+      AttachStdout: true,
+      AttachStderr: true,
+    });
+    const checkStream = await checkExec.start({});
+    const exitCode = await new Promise<number>((resolve) => {
+      checkStream.on("end", async () => {
+        const info = await checkExec.inspect();
+        resolve(info.ExitCode ?? 1);
+      });
+      checkStream.resume();
+    });
+
+    if (exitCode !== 0) {
+      console.log(
+        `[Docker] Scaffolding template for project ${projectId}...`,
+      );
+      const scaffoldExec = await container.exec({
+        Cmd: [
+          "bash",
+          "-c",
+          "cp -a /template/. /workspace/ && rm -rf /workspace/node_modules && ln -s /template/node_modules /workspace/node_modules",
+        ],
+        AttachStdout: true,
+        AttachStderr: true,
+      });
+      const scaffoldStream = await scaffoldExec.start({});
+      await new Promise<void>((resolve) => {
+        scaffoldStream.on("end", resolve);
+        scaffoldStream.resume();
+      });
+      console.log(`[Docker] Template scaffolded for project ${projectId}`);
+    }
+  } catch (e) {
+    console.error("[Docker] Template scaffolding failed:", e);
+  }
 
   return container.id;
 }
@@ -190,6 +227,25 @@ export async function getOrCreateContainer(
 
   // Create new container
   return createProjectContainer(projectId, hostProjectDir, hostPort);
+}
+
+/**
+ * Get a running container for a project by name.
+ */
+export async function getContainerForProject(
+  projectId: string,
+): Promise<Docker.Container | null> {
+  const name = `${CONTAINER_PREFIX}${projectId.slice(0, 12)}`;
+  try {
+    const containers = await docker.listContainers({
+      all: false,
+      filters: { name: [name] },
+    });
+    if (containers.length === 0) return null;
+    return docker.getContainer(containers[0].Id);
+  } catch {
+    return null;
+  }
 }
 
 /**

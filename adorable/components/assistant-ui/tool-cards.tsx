@@ -222,10 +222,60 @@ export const WriteFileToolCard: ToolCallMessagePartComponent = ({
   const a = parse(argsText);
   const running = status?.type === "running";
 
+  const dispatched = useRef(false);
+  useEffect(() => {
+    if (status?.type === "running" || dispatched.current) return;
+    dispatched.current = true;
+    const filePath = str(a.file);
+    const content = str(a.content);
+    if (filePath) {
+      window.dispatchEvent(
+        new CustomEvent("voxel:file-changed", {
+          detail: { path: filePath, content: content || undefined },
+        }),
+      );
+    }
+  }, [status, a]);
+
   return (
     <ToolLine
       label={running ? "Writing" : "Wrote"}
       detail={str(a.file)}
+      status={status}
+    />
+  );
+};
+
+export const BatchWriteFilesToolCard: ToolCallMessagePartComponent = ({
+  argsText,
+  status,
+}) => {
+  const a = parse(argsText);
+  const running = status?.type === "running";
+  const files = Array.isArray(a.files) ? a.files : [];
+  const count = files.length;
+
+  const dispatched = useRef(false);
+  useEffect(() => {
+    if (status?.type === "running" || dispatched.current) return;
+    dispatched.current = true;
+    for (const f of files) {
+      const filePath = str((f as Obj).file);
+      const content = str((f as Obj).content);
+      if (filePath) {
+        window.dispatchEvent(
+          new CustomEvent("voxel:file-changed", {
+            detail: { path: filePath, content: content || undefined },
+          }),
+        );
+      }
+    }
+  }, [status, files]);
+
+  return (
+    <ToolLine
+      label={running ? "Writing" : "Wrote"}
+      detail={`${count} file${count !== 1 ? "s" : ""}`}
       status={status}
     />
   );
@@ -276,6 +326,20 @@ export const ReplaceInFileToolCard: ToolCallMessagePartComponent = ({
   const a = parse(argsText);
   const running = status?.type === "running";
 
+  const dispatched = useRef(false);
+  useEffect(() => {
+    if (status?.type === "running" || dispatched.current) return;
+    dispatched.current = true;
+    const filePath = str(a.file);
+    if (filePath) {
+      window.dispatchEvent(
+        new CustomEvent("voxel:file-changed", {
+          detail: { path: filePath },
+        }),
+      );
+    }
+  }, [status, a]);
+
   return (
     <ToolLine
       label={running ? "Editing" : "Edited"}
@@ -291,6 +355,20 @@ export const AppendToFileToolCard: ToolCallMessagePartComponent = ({
 }) => {
   const a = parse(argsText);
   const running = status?.type === "running";
+
+  const dispatched = useRef(false);
+  useEffect(() => {
+    if (status?.type === "running" || dispatched.current) return;
+    dispatched.current = true;
+    const filePath = str(a.file);
+    if (filePath) {
+      window.dispatchEvent(
+        new CustomEvent("voxel:file-changed", {
+          detail: { path: filePath },
+        }),
+      );
+    }
+  }, [status, a]);
 
   return (
     <ToolLine
@@ -324,6 +402,24 @@ export const MovePathToolCard: ToolCallMessagePartComponent = ({
   const a = parse(argsText);
   const running = status?.type === "running";
 
+  const dispatched = useRef(false);
+  useEffect(() => {
+    if (status?.type === "running" || dispatched.current) return;
+    dispatched.current = true;
+    const fromPath = str(a.from);
+    const toPath = str(a.to);
+    if (fromPath) {
+      window.dispatchEvent(
+        new CustomEvent("voxel:file-deleted", { detail: { path: fromPath } }),
+      );
+    }
+    if (toPath) {
+      window.dispatchEvent(
+        new CustomEvent("voxel:file-changed", { detail: { path: toPath } }),
+      );
+    }
+  }, [status, a]);
+
   return (
     <ToolLine
       label={running ? "Moving" : "Moved"}
@@ -339,6 +435,18 @@ export const DeletePathToolCard: ToolCallMessagePartComponent = ({
 }) => {
   const a = parse(argsText);
   const running = status?.type === "running";
+
+  const dispatched = useRef(false);
+  useEffect(() => {
+    if (status?.type === "running" || dispatched.current) return;
+    dispatched.current = true;
+    const filePath = str(a.path);
+    if (filePath) {
+      window.dispatchEvent(
+        new CustomEvent("voxel:file-deleted", { detail: { path: filePath } }),
+      );
+    }
+  }, [status, a]);
 
   return (
     <ToolLine

@@ -14,7 +14,9 @@ import {
   ChevronLeftIcon,
   ChevronUpIcon,
   CodeIcon,
+  FileCodeIcon,
   FileTextIcon,
+  GlobeIcon,
   Loader2Icon,
   MonitorIcon,
   PlusIcon,
@@ -28,6 +30,8 @@ import { ErrorPopup } from "@/components/assistant-ui/error-popup";
 import { XTerminal } from "@/components/xterm-terminal";
 import { useDevServer } from "@/hooks/use-dev-server";
 import { useContainer } from "@/hooks/use-container";
+import { CodeEditor } from "@/components/code-editor/code-editor";
+import { PreviewLoadingOverlay } from "@/components/code-editor/preview-loading-overlay";
 
 type TerminalTab = {
   id: string;
@@ -244,11 +248,21 @@ export function RepoWorkspaceShell({
   const isMobile = useIsMobile();
   const { latestError, fixError, dismissError } = useErrorDetection();
   const [mobileView, setMobileView] = useState<"chat" | "preview">("chat");
+  const [rightPanelView, setRightPanelView] = useState<"code" | "preview">(
+    "preview",
+  );
 
   // Reset to chat view when navigating away
   useEffect(() => {
     if (!repoId) setMobileView("chat");
   }, [repoId]);
+
+  // Auto-switch to Code tab when AI writes files
+  useEffect(() => {
+    const handler = () => setRightPanelView("code");
+    window.addEventListener("voxel:file-changed", handler);
+    return () => window.removeEventListener("voxel:file-changed", handler);
+  }, []);
 
   // On mobile, compute which panel to show
   const gridColumns = (() => {
@@ -395,7 +409,7 @@ export function RepoWorkspaceShell({
                 </div>
               )}
 
-              {/* Right: browser controls + publish (desktop only) */}
+              {/* Right: Code/Preview toggle + browser controls + publish (desktop only) */}
               {!isMobile && (
                 <div
                   className={cn(
@@ -405,15 +419,48 @@ export function RepoWorkspaceShell({
                       : "pointer-events-none opacity-0",
                   )}
                 >
-                  {showWorkspacePanel && selectedRepo.vm?.previewUrl && (
-                    <BrowserControls
-                      previewUrl={selectedRepo.vm.previewUrl}
-                      iframeRef={iframeRef}
-                      repo={selectedRepo}
-                      onSetProductionDomain={onSetProductionDomain}
-                      onPromoteDeployment={onPromoteDeployment}
-                    />
+                  {/* Code/Preview toggle */}
+                  {showWorkspacePanel && (
+                    <div className="mr-2 flex items-center rounded-lg bg-zinc-900 p-0.5">
+                      <button
+                        type="button"
+                        className={cn(
+                          "flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                          rightPanelView === "code"
+                            ? "bg-zinc-700 text-white"
+                            : "text-zinc-400 hover:text-zinc-300",
+                        )}
+                        onClick={() => setRightPanelView("code")}
+                      >
+                        <FileCodeIcon className="h-3.5 w-3.5" />
+                        Code
+                      </button>
+                      <button
+                        type="button"
+                        className={cn(
+                          "flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                          rightPanelView === "preview"
+                            ? "bg-zinc-700 text-white"
+                            : "text-zinc-400 hover:text-zinc-300",
+                        )}
+                        onClick={() => setRightPanelView("preview")}
+                      >
+                        <GlobeIcon className="h-3.5 w-3.5" />
+                        Preview
+                      </button>
+                    </div>
                   )}
+                  {showWorkspacePanel &&
+                    rightPanelView === "preview" &&
+                    selectedRepo.vm?.previewUrl && (
+                      <BrowserControls
+                        previewUrl={selectedRepo.vm.previewUrl}
+                        iframeRef={iframeRef}
+                        repo={selectedRepo}
+                        onSetProductionDomain={onSetProductionDomain}
+                        onPromoteDeployment={onPromoteDeployment}
+                      />
+                    )}
                 </div>
               )}
             </div>
@@ -447,11 +494,21 @@ export function RepoWorkspaceShell({
               )}
             >
               {showWorkspacePanel && repoId && (
-                <AppPreview
-                  metadata={selectedRepo?.vm ?? null}
-                  iframeRef={iframeRef}
-                  repoId={repoId}
-                />
+                <>
+                  {rightPanelView === "code" ? (
+                    <div className="flex h-full flex-col overflow-hidden p-2 pl-0">
+                      <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-border/50">
+                        <CodeEditor projectId={repoId} />
+                      </div>
+                    </div>
+                  ) : (
+                    <AppPreview
+                      metadata={selectedRepo?.vm ?? null}
+                      iframeRef={iframeRef}
+                      repoId={repoId}
+                    />
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -478,6 +535,38 @@ export function RepoWorkspaceShell({
                 <CodeIcon className="size-5" />
               )}
             </button>
+          )}
+
+          {/* Mobile Code/Preview toggle (when in right panel on mobile) */}
+          {isMobile && showWorkspacePanel && mobileView === "preview" && (
+            <div className="fixed right-4 bottom-36 z-50 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => setRightPanelView("code")}
+                className={cn(
+                  "flex size-10 items-center justify-center rounded-xl shadow-lg transition-all active:scale-90",
+                  rightPanelView === "code"
+                    ? "bg-blue-600 text-white"
+                    : "bg-zinc-800 text-zinc-400",
+                )}
+                title="Code"
+              >
+                <FileCodeIcon className="size-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setRightPanelView("preview")}
+                className={cn(
+                  "flex size-10 items-center justify-center rounded-xl shadow-lg transition-all active:scale-90",
+                  rightPanelView === "preview"
+                    ? "bg-blue-600 text-white"
+                    : "bg-zinc-800 text-zinc-400",
+                )}
+                title="Preview"
+              >
+                <GlobeIcon className="size-4" />
+              </button>
+            </div>
           )}
         </div>
       </ProjectConversationsProvider>
@@ -604,27 +693,12 @@ function AppPreview({
         className="relative flex min-h-0 flex-col overflow-hidden rounded-xl border border-border/50 bg-background transition-all duration-300"
         style={{ flex: terminalOpen ? "1 1 65%" : "1 1 100%" }}
       >
-        {/* Loading state */}
-        {(!effectivePreviewUrl || !iframeLoaded || devServerLoading || containerLoading) && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
-            <div className="flex flex-col items-center gap-3">
-              <div className="relative">
-                <div className="absolute inset-0 animate-ping rounded-full bg-primary/20" />
-                <Loader2Icon className="relative size-6 animate-spin text-muted-foreground/60" />
-              </div>
-              <p className="text-sm text-muted-foreground/50">
-                {containerLoading
-                  ? "Preparing environment..."
-                  : devServerLoading || !effectivePreviewUrl
-                    ? "Starting dev server..."
-                    : "Loading preview..."}
-              </p>
-              {(containerError || devServerError) && (
-                <p className="text-xs text-destructive">{containerError || devServerError}</p>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Loading overlay — never shows "refused to connect" */}
+        <PreviewLoadingOverlay
+          containerLoading={containerLoading}
+          devServerLoading={devServerLoading || !effectivePreviewUrl}
+          visible={!iframeLoaded}
+        />
         {effectivePreviewUrl && (
           <iframe
             ref={iframeRef}

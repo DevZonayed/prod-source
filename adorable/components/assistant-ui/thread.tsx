@@ -8,6 +8,7 @@ import { Reasoning, ReasoningGroup } from "@/components/assistant-ui/reasoning";
 import {
   AppendToFileToolCard,
   BashToolCard,
+  BatchWriteFilesToolCard,
   CheckAppToolCard,
   CommitToolCard,
   DevServerLogsToolCard,
@@ -194,6 +195,7 @@ const AssistantMessage: FC = () => {
                 deletePathTool: DeletePathToolCard,
                 commitTool: CommitToolCard,
                 checkAppTool: CheckAppToolCard,
+                batchWriteFilesTool: BatchWriteFilesToolCard,
                 devServerLogsTool: DevServerLogsToolCard,
                 // CodeMine tool names
                 view_file: ReadFileToolCard,

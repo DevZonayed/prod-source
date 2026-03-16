@@ -3,11 +3,15 @@ FROM node:22-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl python3 make g++ && rm -rf /var/lib/apt/lists/*
 
+# Pre-built Next.js template with node_modules
+COPY template/ /template/
+RUN cd /template && npm install --prefer-offline && rm -rf /tmp/* /root/.npm
+
 RUN git config --global user.name "Voxel" && \
     git config --global user.email "voxel@local" && \
     git config --global init.defaultBranch main
 
-LABEL voxel.image.version="2"
+LABEL voxel.image.version="3"
 
 WORKDIR /workspace
 
