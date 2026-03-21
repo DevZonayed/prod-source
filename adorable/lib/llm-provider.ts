@@ -1,15 +1,5 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
-import {
-  createOpenAI,
-  type OpenAIResponsesProviderOptions,
-} from "@ai-sdk/openai";
-import {
-  stepCountIs,
-  streamText,
-  type UIMessage,
-  type ToolSet,
-  convertToModelMessages,
-} from "ai";
+import { createOpenAI } from "@ai-sdk/openai";
 import { createClaudeCodeFetch } from "@/lib/claude-fetch";
 
 type LlmProviderName = "openai" | "anthropic" | "claude-code";
@@ -72,20 +62,6 @@ const createAnthropicProvider = (provider: LlmProviderName, apiKey?: string) => 
   return apiKey ? createAnthropic({ apiKey }) : createAnthropic({});
 };
 
-type StreamLlmResponseParams = {
-  system: string;
-  messages: UIMessage[];
-  tools: ToolSet;
-  apiKey?: string;
-  providerOverride?: string;
-  modelOverride?: string;
-};
-
-type StreamLlmResponseResult = {
-  result: ReturnType<typeof streamText>;
-  provider: LlmProviderName;
-};
-
 /**
  * Returns a model instance for the given provider.
  * Used by the CodeMine agentic loop to get the model without calling streamText directly.
@@ -113,58 +89,4 @@ export const getModelForProvider = async (
 
   const anthropicProvider = createAnthropicProvider(provider, apiKey);
   return anthropicProvider(modelId);
-};
-
-export const streamLlmResponse = async ({
-  system,
-  messages,
-  tools,
-  apiKey,
-  providerOverride,
-  modelOverride,
-}: StreamLlmResponseParams): Promise<StreamLlmResponseResult> => {
-  const provider = getProviderName(providerOverride);
-  const modelId = resolveModel(provider, modelOverride);
-  const modelMessages = await convertToModelMessages(messages);
-
-  if (provider === "openai") {
-    const openaiProvider = apiKey ? createOpenAI({ apiKey }) : createOpenAI({});
-    const result = streamText({
-      system,
-      model: openaiProvider.responses(modelId),
-      messages: modelMessages,
-      tools,
-      providerOptions: {
-        openai: {
-          reasoningEffort: "low",
-        } satisfies OpenAIResponsesProviderOptions,
-      },
-      stopWhen: stepCountIs(200),
-    });
-
-    return {
-      result,
-      provider,
-    };
-  }
-
-  console.log("[LLM Provider] streamLlmResponse Anthropic config:", JSON.stringify({
-    provider,
-    modelId,
-    tokenSource: provider === "claude-code" ? "per-request-fetch" : (apiKey ? "passed-in" : "env"),
-  }));
-
-  const anthropicProvider = createAnthropicProvider(provider, apiKey);
-  const result = streamText({
-    system,
-    model: anthropicProvider(modelId),
-    messages: modelMessages,
-    tools,
-    stopWhen: stepCountIs(200),
-  });
-
-  return {
-    result,
-    provider,
-  };
 };
