@@ -40,6 +40,9 @@ import {
 import {
   MAX_VIEW_FILE_LINES,
   MAX_GREP_RESULTS,
+  MAX_BACKGROUND_PROCESSES,
+  BACKGROUND_LOG_PREFIX,
+  MAX_TERMINAL_OUTPUT_LINES,
 } from "./codemine/constants";
 import { readRepoMetadata } from "./repo-storage";
 import { buildInitialEphemeral } from "./codemine/ephemeral";
@@ -76,6 +79,9 @@ const stripToolPrefix = (name: string): string =>
 // ─── Build MCP Server with VM-scoped tools ───
 
 function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRepoId?: string }) {
+  // Background process tracking (persists across tool calls within the same session)
+  const backgroundProcesses = new Map<string, { pid: number; command: string; logFile: string; startedAt: number }>();
+
   return createSdkMcpServer({
     name: MCP_SERVER_NAME,
     version: "1.0.0",
@@ -239,6 +245,48 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
         },
       ),
 
+      sdkTool(
+        "codebase_search",
+        "Semantic search across the codebase using a natural language query. Searches for each word and ranks files by relevance. Use this for broad discovery; use grep_search for exact patterns.",
+        {
+          Query: z.string().describe("Natural language search query"),
+          DirectoryPath: z.string().optional().describe("Optional directory to scope the search"),
+        },
+        async (args) => {
+          const searchDir = args.DirectoryPath ? resolveAbsPath(args.DirectoryPath) ?? "." : ".";
+          const terms = args.Query.toLowerCase().split(/\s+/).filter((t) => t.length > 2);
+          if (terms.length === 0) return { content: [{ type: "text" as const, text: "Error: Query too short. Provide meaningful search terms." }] };
+
+          const fileScores = new Map<string, { score: number; lines: string[] }>();
+          for (const term of terms.slice(0, 5)) {
+            const cmd = `grep -rn --color=never -i --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git --exclude-dir=dist ${shellQuote(term)} ${shellQuote(searchDir)} 2>/dev/null | head -100`;
+            const result = await runVmCommand(vm, cmd);
+            if (!result.stdout) continue;
+            for (const line of result.stdout.split("\n").filter(Boolean)) {
+              const colonIdx = line.indexOf(":");
+              if (colonIdx === -1) continue;
+              const file = line.substring(0, colonIdx);
+              const entry = fileScores.get(file) ?? { score: 0, lines: [] };
+              entry.score++;
+              if (entry.lines.length < 3) entry.lines.push(line);
+              fileScores.set(file, entry);
+            }
+          }
+
+          const ranked = [...fileScores.entries()]
+            .sort((a, b) => b[1].score - a[1].score)
+            .slice(0, 20);
+
+          if (ranked.length === 0) return { content: [{ type: "text" as const, text: `Query: ${args.Query}\n(no matches found)` }] };
+
+          const output = ranked
+            .map(([file, { score, lines }]) => `[${score}/${terms.length} terms] ${file}\n${lines.map((l) => `  ${l}`).join("\n")}`)
+            .join("\n\n");
+
+          return { content: [{ type: "text" as const, text: `Query: ${args.Query} (${ranked.length} files found)\n\n${output}` }] };
+        },
+      ),
+
       // ─── Terminal Tools ───
 
       sdkTool(
@@ -261,6 +309,86 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
             `exit_code: ${result.exitCode ?? 0}`,
           ].filter(Boolean).join("\n\n");
           return { content: [{ type: "text" as const, text: output || "(no output)" }] };
+        },
+      ),
+
+      sdkTool(
+        "run_in_background",
+        "Start a long-running process (dev servers, watchers, build processes) that persists across tool calls. Returns a TerminalId for monitoring via read_terminal_output.",
+        {
+          Command: z.string().describe("Command to run in the background"),
+          WorkingDirectory: z.string().optional().describe("Optional working directory"),
+        },
+        async (args) => {
+          if (backgroundProcesses.size >= MAX_BACKGROUND_PROCESSES) {
+            const active = [...backgroundProcesses.entries()].map(([id, p]) => `${id} (pid ${p.pid}): ${p.command}`).join("\n");
+            return { content: [{ type: "text" as const, text: `Error: Maximum ${MAX_BACKGROUND_PROCESSES} background processes reached. Kill an existing process first.\n\nActive:\n${active}` }] };
+          }
+
+          const cwd = args.WorkingDirectory ? resolveAbsPath(args.WorkingDirectory) ?? "." : ".";
+          const terminalId = `bg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+          const logFile = `${BACKGROUND_LOG_PREFIX}-${terminalId}.log`;
+
+          const startCmd = cwd === "."
+            ? `nohup bash -c ${shellQuote(args.Command)} > ${shellQuote(logFile)} 2>&1 & echo $!`
+            : `cd ${shellQuote(cwd)} && nohup bash -c ${shellQuote(args.Command)} > ${shellQuote(logFile)} 2>&1 & echo $!`;
+          const result = await runVmCommand(vm, startCmd);
+
+          const pid = parseInt(result.stdout.trim(), 10);
+          if (isNaN(pid)) {
+            return { content: [{ type: "text" as const, text: `Error: Failed to start background process. Could not capture PID.\n${result.stdout}\n${result.stderr}` }] };
+          }
+
+          backgroundProcesses.set(terminalId, { pid, command: args.Command, logFile, startedAt: Date.now() });
+          return { content: [{ type: "text" as const, text: `Process started.\nTerminalId: ${terminalId}\nPID: ${pid}\nCommand: ${args.Command}\nLog: ${logFile}\n\nUse read_terminal_output with TerminalId "${terminalId}" to monitor output.` }] };
+        },
+      ),
+
+      sdkTool(
+        "read_terminal_output",
+        "Read recent output from a background process. Also checks if the process is still running.",
+        {
+          TerminalId: z.string().describe("Terminal ID returned by run_in_background"),
+          Lines: z.number().int().min(1).max(MAX_TERMINAL_OUTPUT_LINES).default(50).describe("Number of recent lines to return (default: 50)"),
+        },
+        async (args) => {
+          const proc = backgroundProcesses.get(args.TerminalId);
+          if (!proc) {
+            const available = backgroundProcesses.size > 0
+              ? `Available: ${[...backgroundProcesses.keys()].join(", ")}`
+              : "No background processes running.";
+            return { content: [{ type: "text" as const, text: `Error: Unknown TerminalId: ${args.TerminalId}\n${available}` }] };
+          }
+
+          const aliveCheck = await runVmCommand(vm, `kill -0 ${proc.pid} 2>/dev/null && echo "RUNNING" || echo "STOPPED"`);
+          const isRunning = aliveCheck.stdout.trim() === "RUNNING";
+          const logCmd = `tail -${args.Lines} ${shellQuote(proc.logFile)} 2>/dev/null || echo "(no output yet)"`;
+          const logResult = await runVmCommand(vm, logCmd);
+          const uptimeSec = Math.round((Date.now() - proc.startedAt) / 1000);
+
+          return { content: [{ type: "text" as const, text: `TerminalId: ${args.TerminalId}\nPID: ${proc.pid}\nCommand: ${proc.command}\nStatus: ${isRunning ? "RUNNING" : "STOPPED"}\nUptime: ${uptimeSec}s\n\n--- Output (last ${args.Lines} lines) ---\n${logResult.stdout}` }] };
+        },
+      ),
+
+      sdkTool(
+        "kill_process",
+        "Kill a background process by its Terminal ID.",
+        {
+          TerminalId: z.string().describe("Terminal ID of the process to kill"),
+        },
+        async (args) => {
+          const proc = backgroundProcesses.get(args.TerminalId);
+          if (!proc) {
+            const available = backgroundProcesses.size > 0
+              ? `Available: ${[...backgroundProcesses.keys()].join(", ")}`
+              : "No background processes running.";
+            return { content: [{ type: "text" as const, text: `Error: Unknown TerminalId: ${args.TerminalId}\n${available}` }] };
+          }
+
+          await runVmCommand(vm, `kill -TERM ${proc.pid} 2>/dev/null; sleep 0.5; kill -0 ${proc.pid} 2>/dev/null && kill -9 ${proc.pid} 2>/dev/null; echo "KILLED"`);
+          backgroundProcesses.delete(args.TerminalId);
+
+          return { content: [{ type: "text" as const, text: `Killed process ${proc.pid} (${proc.command}).\nTerminalId ${args.TerminalId} removed.` }] };
         },
       ),
 
@@ -370,13 +498,20 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
 
 // ─── Collect all tool names for allowedTools ───
 
-const ALL_VM_TOOL_NAMES = [
+const ALL_MCP_TOOL_NAMES = [
   "view_file", "edit_file", "create_file", "delete_file", "list_dir",
-  "grep_search", "find_by_name",
-  "run_command",
+  "grep_search", "find_by_name", "codebase_search",
+  "run_command", "run_in_background", "read_terminal_output", "kill_process",
   "git_status", "git_diff", "git_log", "git_commit",
   "check_app",
 ].map(mcpToolName);
+
+// Built-in CLI tools allowed alongside MCP tools.
+// WebSearch = Anthropic server-side search (executed by Anthropic's servers, not locally)
+// WebFetch  = local HTTP fetch + HTML→markdown (executed by the CLI process)
+const ALLOWED_BUILTIN_TOOLS = ["WebSearch", "WebFetch"];
+
+const ALL_ALLOWED_TOOLS = [...ALL_MCP_TOOL_NAMES, ...ALLOWED_BUILTIN_TOOLS];
 
 // ─── Build conversation prompt from UIMessages ───
 
@@ -485,7 +620,7 @@ export function createClaudeSdkStreamResponse(
             model: options.model ?? "sonnet",
             maxTurns: options.maxTurns ?? 200,
             mcpServers: { [MCP_SERVER_NAME]: mcpServer },
-            allowedTools: ALL_VM_TOOL_NAMES,
+            allowedTools: ALL_ALLOWED_TOOLS,
             tools: [],
             permissionMode: "bypassPermissions",
             includePartialMessages: true,
@@ -503,7 +638,8 @@ export function createClaudeSdkStreamResponse(
                 ensureStep();
                 currentTextId = crypto.randomUUID();
                 writer.write({ type: "text-start", id: currentTextId });
-              } else if (block?.type === "tool_use") {
+              } else if (block?.type === "tool_use" || block?.type === "server_tool_use") {
+                // Handle both MCP/custom tool_use AND server-side tools (WebSearch)
                 endText();
                 ensureStep();
                 const rawName = (block.name as string) || "unknown";
@@ -517,6 +653,29 @@ export function createClaudeSdkStreamResponse(
                   toolCallId,
                   toolName: cleanName,
                 });
+              } else if (block?.type === "web_search_tool_result") {
+                // Server-side WebSearch results — emit as tool output
+                endText();
+                ensureStep();
+                const toolUseId = (block.tool_use_id as string) || "";
+                const content = block.content;
+                let resultText = "";
+                if (Array.isArray(content)) {
+                  const searchResults = content as Array<{ type?: string; title?: string; url?: string; encrypted_content?: string }>;
+                  resultText = searchResults
+                    .filter((r) => r.type === "search_result")
+                    .map((r) => `- ${r.title ?? ""}  \n  ${r.url ?? ""}`)
+                    .join("\n");
+                } else if (content && typeof content === "object" && "error_code" in (content as Record<string, unknown>)) {
+                  resultText = `Web search error: ${(content as Record<string, unknown>).error_code}`;
+                }
+                if (toolUseId && emittedToolCallIds.has(toolUseId)) {
+                  writer.write({
+                    type: "tool-output-available",
+                    toolCallId: toolUseId,
+                    output: resultText || "Search completed",
+                  });
+                }
               }
             }
 
@@ -598,7 +757,7 @@ export function createClaudeSdkStreamResponse(
             if (Array.isArray(content)) {
               for (const block of content) {
                 const b = block as Record<string, unknown>;
-                if (b.type === "tool_use" && typeof b.name === "string") {
+                if ((b.type === "tool_use" || b.type === "server_tool_use") && typeof b.name === "string") {
                   const toolCallId = (b.id as string) || crypto.randomUUID();
                   // Only emit if not already streamed via stream_event
                   if (!emittedToolCallIds.has(toolCallId)) {

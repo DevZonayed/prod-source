@@ -8,18 +8,9 @@ import { getClaudeAccessToken } from "@/lib/claude-auth";
 // ─── Claude Agent SDK provider (OAuth via CLI binary + VM-scoped MCP tools) ───
 import { createClaudeSdkStreamResponse } from "@/lib/claude-sdk-provider";
 
-// ─── CodeMine (new agentic engine) ───
+// ─── CodeMine (agentic engine) ───
 import { createCodeMineTools, runAgenticLoop, buildCodeMinePrompt, CODEMINE_SYSTEM_PROMPT } from "@/lib/codemine";
 import type { AgenticLoopState } from "@/lib/codemine";
-
-// ─── BuildForge (legacy, kept for backward compat) ───
-import { createTools as createBaseTools } from "@/lib/create-tools";
-import { streamLlmResponse } from "@/lib/llm-provider";
-import { buildSystemPrompt, SYSTEM_PROMPT } from "@/lib/system-prompt";
-import { getBuildForgeTools, getProjectMemoryState, readSpec } from "@/lib/buildforge";
-import type { BuildForgeContext } from "@/lib/buildforge";
-
-const AGENT_MODE = (process.env["AGENT_MODE"] ?? "codemine").toLowerCase();
 
 export async function POST(req: Request) {
   const payload = (await req.json()) as {
@@ -106,7 +97,7 @@ export async function POST(req: Request) {
   }
 
   console.log("[LLM Auth]", JSON.stringify({
-    agentMode: AGENT_MODE,
+    agentMode: "codemine",
     envProvider,
     hasGlobalKey,
     hasUserCookie: !!userApiKey,
@@ -133,11 +124,9 @@ export async function POST(req: Request) {
 
     let systemPrompt: string;
     try {
-      systemPrompt = AGENT_MODE === "codemine"
-        ? await buildCodeMinePrompt(vm, userText)
-        : await buildSystemPrompt(vm, userText);
+      systemPrompt = await buildCodeMinePrompt(vm, userText);
     } catch {
-      systemPrompt = AGENT_MODE === "codemine" ? CODEMINE_SYSTEM_PROMPT : SYSTEM_PROMPT;
+      systemPrompt = CODEMINE_SYSTEM_PROMPT;
     }
 
     return createClaudeSdkStreamResponse(vm, messages, {
@@ -170,111 +159,42 @@ export async function POST(req: Request) {
   }
 
   // ═══════════════════════════════════════
-  // CodeMine Agentic Engine (default — requires API key)
+  // CodeMine Agentic Engine (requires API key)
   // ═══════════════════════════════════════
-  if (AGENT_MODE === "codemine") {
-    const loopState: AgenticLoopState = {
-      stepCount: 0,
-      taskState: null,
-      recentFiles: [],
-      backgroundProcesses: new Map(),
-      conversationId,
-      pauseForUser: false,
-      startedAt: Date.now(),
-    };
+  const loopState: AgenticLoopState = {
+    stepCount: 0,
+    taskState: null,
+    recentFiles: [],
+    backgroundProcesses: new Map(),
+    conversationId,
+    pauseForUser: false,
+    startedAt: Date.now(),
+  };
 
-    const tools = createCodeMineTools(vm, loopState, {
-      sourceRepoId: project.id,
-      metadataRepoId: repoId,
-      previewUrl: metadata.vm.previewUrl,
-    });
-
-    let systemPrompt: string;
-    try {
-      systemPrompt = await buildCodeMinePrompt(vm, userText);
-    } catch {
-      systemPrompt = CODEMINE_SYSTEM_PROMPT;
-    }
-
-    const result = await runAgenticLoop({
-      system: systemPrompt,
-      messages,
-      tools,
-      vm,
-      conversationId,
-      previewUrl: metadata.vm.previewUrl,
-      ...llmOptions,
-    });
-
-    return result.toUIMessageStreamResponse({
-      sendReasoning: true,
-      originalMessages: messages,
-      generateMessageId: () => crypto.randomUUID(),
-      messageMetadata: ({ part }) => {
-        if (part.type === "finish") {
-          return {
-            steps: [{ usage: { inputTokens: part.totalUsage.inputTokens ?? 0, outputTokens: part.totalUsage.outputTokens ?? 0 } }],
-          };
-        }
-        return undefined;
-      },
-      onFinish: async ({ messages: finalMessages }) => {
-        const latestMetadata = await readRepoMetadata(repoId);
-        if (!latestMetadata) return;
-        await saveConversationMessages(
-          repoId,
-          latestMetadata,
-          conversationId,
-          finalMessages,
-        );
-      },
-    });
-  }
-
-  // ═══════════════════════════════════════
-  // BuildForge Legacy Mode (AGENT_MODE=buildforge)
-  // ═══════════════════════════════════════
-  const baseTools = createBaseTools(vm, {
+  const tools = createCodeMineTools(vm, loopState, {
     sourceRepoId: project.id,
     metadataRepoId: repoId,
+    previewUrl: metadata.vm.previewUrl,
   });
 
-  let buildForgeTools = {};
+  let systemPrompt: string;
   try {
-    const projectMemory = await getProjectMemoryState(vm);
-    const currentSpec = await readSpec(vm);
-
-    const bfContext: BuildForgeContext = {
-      vm,
-      sourceRepoId: project.id,
-      metadataRepoId: repoId,
-      projectMemory,
-      currentSpec,
-      activePlan: null,
-    };
-
-    buildForgeTools = getBuildForgeTools(vm, bfContext);
-  } catch (e) {
-    console.error("BuildForge tools initialization failed:", e);
-  }
-
-  const tools = { ...baseTools, ...buildForgeTools };
-
-  let systemPromptLegacy: string;
-  try {
-    systemPromptLegacy = await buildSystemPrompt(vm, userText);
+    systemPrompt = await buildCodeMinePrompt(vm, userText);
   } catch {
-    systemPromptLegacy = SYSTEM_PROMPT;
+    systemPrompt = CODEMINE_SYSTEM_PROMPT;
   }
 
-  const llm = await streamLlmResponse({
-    system: systemPromptLegacy,
+  const result = await runAgenticLoop({
+    system: systemPrompt,
     messages,
     tools,
+    vm,
+    conversationId,
+    previewUrl: metadata.vm.previewUrl,
     ...llmOptions,
   });
 
-  return llm.result.toUIMessageStreamResponse({
+  return result.toUIMessageStreamResponse({
     sendReasoning: true,
     originalMessages: messages,
     generateMessageId: () => crypto.randomUUID(),

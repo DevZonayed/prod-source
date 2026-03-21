@@ -6,16 +6,12 @@ import {
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { Reasoning, ReasoningGroup } from "@/components/assistant-ui/reasoning";
 import {
-  AppendToFileToolCard,
   BashToolCard,
-  BatchWriteFilesToolCard,
   CheckAppToolCard,
   CommitToolCard,
   DevServerLogsToolCard,
   DeletePathToolCard,
   ListFilesToolCard,
-  MakeDirectoryToolCard,
-  MovePathToolCard,
   ReadFileToolCard,
   ReplaceInFileToolCard,
   SearchFilesToolCard,
@@ -182,21 +178,6 @@ const AssistantMessage: FC = () => {
             Group: ToolCallGroup,
             tools: {
               by_name: {
-                // Legacy BuildForge tool names
-                bashTool: BashToolCard,
-                readFileTool: ReadFileToolCard,
-                writeFileTool: WriteFileToolCard,
-                listFilesTool: ListFilesToolCard,
-                searchFilesTool: SearchFilesToolCard,
-                replaceInFileTool: ReplaceInFileToolCard,
-                appendToFileTool: AppendToFileToolCard,
-                makeDirectoryTool: MakeDirectoryToolCard,
-                movePathTool: MovePathToolCard,
-                deletePathTool: DeletePathToolCard,
-                commitTool: CommitToolCard,
-                checkAppTool: CheckAppToolCard,
-                batchWriteFilesTool: BatchWriteFilesToolCard,
-                devServerLogsTool: DevServerLogsToolCard,
                 // CodeMine tool names
                 view_file: ReadFileToolCard,
                 edit_file: ReplaceInFileToolCard,
@@ -220,6 +201,11 @@ const AssistantMessage: FC = () => {
                 git_stash: BashToolCard,
                 get_diagnostics: CheckAppToolCard,
                 check_app: CheckAppToolCard,
+                // Built-in CLI tools (WebSearch/WebFetch)
+                WebSearch: SearchFilesToolCard,
+                WebFetch: ReadFileToolCard,
+                web_search: SearchFilesToolCard,
+                web_fetch: ReadFileToolCard,
                 // Claude Agent SDK built-in tool names (if they leak through)
                 Bash: BashToolCard,
                 Read: ReadFileToolCard,
