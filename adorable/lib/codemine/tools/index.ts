@@ -14,6 +14,7 @@ import { createIdeContextTools } from "./ide-context";
 type CreateToolsOptions = {
   sourceRepoId?: string;
   metadataRepoId?: string;
+  projectId: string;
   previewUrl: string;
 };
 
@@ -49,7 +50,7 @@ export function createCodeMineTools(
   const search = createSearchTools(vm);
   const terminal = createTerminalTools(vm, state);
   const taskMgmt = createTaskManagementTools(vm, state);
-  const browser = createBrowserTools(vm, options.previewUrl);
+  const browser = createBrowserTools(options.projectId, options.previewUrl);
   const git = createGitTools(vm, {
     sourceRepoId: options.sourceRepoId,
     metadataRepoId: options.metadataRepoId,

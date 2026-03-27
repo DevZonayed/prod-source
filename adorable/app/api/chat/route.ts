@@ -174,6 +174,7 @@ export async function POST(req: Request) {
   const tools = createCodeMineTools(vm, loopState, {
     sourceRepoId: project.id,
     metadataRepoId: repoId,
+    projectId: repoId,
     previewUrl: metadata.vm.previewUrl,
   });
 

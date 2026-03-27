@@ -31,6 +31,30 @@ const parse = (argsText: string): Obj => {
 const str = (v: unknown): string | undefined =>
   typeof v === "string" && v.length > 0 ? v : undefined;
 
+/** Pick the first defined string from multiple keys (handles legacy + CodeMine naming) */
+const pick = (o: Obj, ...keys: string[]): string | undefined => {
+  for (const k of keys) {
+    const v = str(o[k]);
+    if (v) return v;
+  }
+  return undefined;
+};
+
+/** Extract text from MCP-style result (content array or plain object) */
+const resultText = (r: unknown): string | undefined => {
+  if (!r) return undefined;
+  if (typeof r === "string") return r;
+  const o = obj(r);
+  // MCP returns { content: [{ text: "..." }] }
+  if (Array.isArray(o.content)) {
+    return (o.content as Array<{ text?: string }>)
+      .map((c) => c.text ?? "")
+      .filter(Boolean)
+      .join("\n") || undefined;
+  }
+  return str(o.stdout) || str(o.stderr) || str(o.content) || str(o.results) || str(o.result) || str(o.data);
+};
+
 const preview = (v: unknown, max = 12): string | null => {
   if (v == null) return null;
   const t = typeof v === "string" ? v : JSON.stringify(v, null, 2);
@@ -117,7 +141,7 @@ const ToolLine = ({
       </button>
 
       {open && expandContent && (
-        <div className="mt-1 mb-1 ml-7 max-h-64 overflow-auto rounded border bg-muted/30 px-3 py-2">
+        <div className="mt-1 mb-1 ml-7 max-h-80 overflow-auto rounded border bg-muted/30 px-3 py-2">
           {expandContent}
         </div>
       )}
@@ -131,7 +155,7 @@ const ToolLine = ({
 
 const DetailBlock = ({ data }: { data: unknown }) => {
   if (data == null) return null;
-  const text = preview(data, 20);
+  const text = preview(data, 30);
   if (!text) return null;
   return (
     <pre className="text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
@@ -151,8 +175,8 @@ export const BashToolCard: ToolCallMessagePartComponent = ({
 }) => {
   const a = parse(argsText);
   const r = obj(result);
-  const cmd = str(a.command);
-  const hasOutput = str(r.stdout) || str(r.stderr);
+  const cmd = pick(a, "command", "Command");
+  const output = resultText(result) || str(r.stdout) || str(r.stderr);
   const running = status?.type === "running";
 
   const bashDispatched = useRef(false);
@@ -181,14 +205,14 @@ export const BashToolCard: ToolCallMessagePartComponent = ({
       detail={cmd}
       status={status}
       expandContent={
-        cmd ? (
+        (cmd || output) ? (
           <div className="space-y-2">
-            <pre className="text-xs leading-relaxed whitespace-pre-wrap text-foreground">
-              {cmd}
-            </pre>
-            {(str(r.stdout) || str(r.stderr)) && (
-              <DetailBlock data={r.stdout || r.stderr} />
+            {cmd && (
+              <pre className="text-xs leading-relaxed whitespace-pre-wrap text-foreground">
+                {cmd}
+              </pre>
             )}
+            {output && <DetailBlock data={output} />}
           </div>
         ) : undefined
       }
@@ -202,32 +226,35 @@ export const ReadFileToolCard: ToolCallMessagePartComponent = ({
   status,
 }) => {
   const a = parse(argsText);
-  const r = obj(result);
   const running = status?.type === "running";
+  const filePath = pick(a, "file", "AbsolutePath", "Path", "path", "file_path");
+  const output = resultText(result);
 
   return (
     <ToolLine
       label={running ? "Reading" : "Read"}
-      detail={str(a.file)}
+      detail={filePath}
       status={status}
-      expandContent={r.content ? <DetailBlock data={r.content} /> : undefined}
+      expandContent={output ? <DetailBlock data={output} /> : undefined}
     />
   );
 };
 
 export const WriteFileToolCard: ToolCallMessagePartComponent = ({
   argsText,
+  result,
   status,
 }) => {
   const a = parse(argsText);
   const running = status?.type === "running";
+  const filePath = pick(a, "file", "AbsolutePath", "path", "file_path");
+  const content = pick(a, "content", "Content");
+  const output = resultText(result);
 
   const dispatched = useRef(false);
   useEffect(() => {
     if (status?.type === "running" || dispatched.current) return;
     dispatched.current = true;
-    const filePath = str(a.file);
-    const content = str(a.content);
     if (filePath) {
       window.dispatchEvent(
         new CustomEvent("voxel:file-changed", {
@@ -235,13 +262,14 @@ export const WriteFileToolCard: ToolCallMessagePartComponent = ({
         }),
       );
     }
-  }, [status, a]);
+  }, [status, filePath, content]);
 
   return (
     <ToolLine
       label={running ? "Writing" : "Wrote"}
-      detail={str(a.file)}
+      detail={filePath}
       status={status}
+      expandContent={output ? <DetailBlock data={output} /> : undefined}
     />
   );
 };
@@ -287,15 +315,16 @@ export const ListFilesToolCard: ToolCallMessagePartComponent = ({
   status,
 }) => {
   const a = parse(argsText);
-  const r = obj(result);
   const running = status?.type === "running";
+  const dirPath = pick(a, "path", "DirectoryPath", "SearchPattern");
+  const output = resultText(result);
 
   return (
     <ToolLine
       label={running ? "Listing" : "Listed"}
-      detail={str(a.path)}
+      detail={dirPath}
       status={status}
-      expandContent={r.stdout ? <DetailBlock data={r.stdout} /> : undefined}
+      expandContent={output ? <DetailBlock data={output} /> : undefined}
     />
   );
 };
@@ -306,31 +335,36 @@ export const SearchFilesToolCard: ToolCallMessagePartComponent = ({
   status,
 }) => {
   const a = parse(argsText);
-  const r = obj(result);
   const running = status?.type === "running";
+  const query = pick(a, "query", "Query", "SearchPattern", "q");
+  const output = resultText(result);
 
   return (
     <ToolLine
       label={running ? "Searching" : "Searched"}
-      detail={str(a.query) ? `"${a.query}"` : undefined}
+      detail={query ? `"${query}"` : undefined}
       status={status}
-      expandContent={r.stdout ? <DetailBlock data={r.stdout} /> : undefined}
+      expandContent={output ? <DetailBlock data={output} /> : undefined}
     />
   );
 };
 
 export const ReplaceInFileToolCard: ToolCallMessagePartComponent = ({
   argsText,
+  result,
   status,
 }) => {
   const a = parse(argsText);
   const running = status?.type === "running";
+  const filePath = pick(a, "file", "AbsolutePath", "path", "file_path");
+  const oldStr = pick(a, "old_string", "OldString");
+  const newStr = pick(a, "new_string", "NewString");
+  const output = resultText(result);
 
   const dispatched = useRef(false);
   useEffect(() => {
     if (status?.type === "running" || dispatched.current) return;
     dispatched.current = true;
-    const filePath = str(a.file);
     if (filePath) {
       window.dispatchEvent(
         new CustomEvent("voxel:file-changed", {
@@ -338,13 +372,34 @@ export const ReplaceInFileToolCard: ToolCallMessagePartComponent = ({
         }),
       );
     }
-  }, [status, a]);
+  }, [status, filePath]);
+
+  const hasDiff = oldStr || newStr;
 
   return (
     <ToolLine
       label={running ? "Editing" : "Edited"}
-      detail={str(a.file)}
+      detail={filePath}
       status={status}
+      expandContent={
+        (hasDiff || output) ? (
+          <div className="space-y-2">
+            {oldStr && (
+              <div>
+                <p className="mb-0.5 text-[10px] font-medium tracking-wider text-red-400/80 uppercase">Removed</p>
+                <pre className="text-xs leading-relaxed whitespace-pre-wrap text-red-400/70">{preview(oldStr, 8)}</pre>
+              </div>
+            )}
+            {newStr && (
+              <div>
+                <p className="mb-0.5 text-[10px] font-medium tracking-wider text-green-400/80 uppercase">Added</p>
+                <pre className="text-xs leading-relaxed whitespace-pre-wrap text-green-400/70">{preview(newStr, 8)}</pre>
+              </div>
+            )}
+            {output && <DetailBlock data={output} />}
+          </div>
+        ) : undefined
+      }
     />
   );
 };
@@ -431,28 +486,31 @@ export const MovePathToolCard: ToolCallMessagePartComponent = ({
 
 export const DeletePathToolCard: ToolCallMessagePartComponent = ({
   argsText,
+  result,
   status,
 }) => {
   const a = parse(argsText);
   const running = status?.type === "running";
+  const filePath = pick(a, "path", "AbsolutePath");
+  const output = resultText(result);
 
   const dispatched = useRef(false);
   useEffect(() => {
     if (status?.type === "running" || dispatched.current) return;
     dispatched.current = true;
-    const filePath = str(a.path);
     if (filePath) {
       window.dispatchEvent(
         new CustomEvent("voxel:file-deleted", { detail: { path: filePath } }),
       );
     }
-  }, [status, a]);
+  }, [status, filePath]);
 
   return (
     <ToolLine
       label={running ? "Deleting" : "Deleted"}
-      detail={str(a.path)}
+      detail={filePath}
       status={status}
+      expandContent={output ? <DetailBlock data={output} /> : undefined}
     />
   );
 };
@@ -467,10 +525,9 @@ export const CommitToolCard: ToolCallMessagePartComponent = ({
   const running = status?.type === "running";
   const cancelled =
     status?.type === "incomplete" && status.reason === "cancelled";
-  const message = str(a.message);
-  const stderr = str(r.stderr);
-  const stdout = str(r.stdout);
-  const output = [stderr, stdout].filter(Boolean).join("\n");
+  const message = pick(a, "message", "Message");
+  const commitOutput = resultText(result) || [str(r.stderr), str(r.stdout)].filter(Boolean).join("\n");
+  const output = commitOutput || "";
   const hasFailureText = /\berror:\b|\bfatal:\b|\bfailed\b/i.test(output);
   const failed = !running && (r.ok === false || cancelled || hasFailureText);
 
@@ -490,7 +547,7 @@ export const CommitToolCard: ToolCallMessagePartComponent = ({
       status={status}
       failed={failed}
       expandContent={
-        stderr || stdout ? <DetailBlock data={stderr ?? stdout} /> : undefined
+        output ? <DetailBlock data={output} /> : undefined
       }
     />
   );
