@@ -120,12 +120,17 @@ export function buildStepEphemeral(ctx: EphemeralContext): string {
  */
 function buildCriticalInstructions(): string {
   return [
-    `CRITICAL INSTRUCTION 1: Always prioritize the most specific tool available for any task.`,
-    `  (a) NEVER run 'cat' inside a bash command to create or append to files — use create_file or edit_file.`,
-    `  (b) ALWAYS use grep_search instead of running grep in bash unless absolutely needed.`,
-    `  (c) DO NOT use ls for listing, cat for viewing, grep for finding, sed for replacing when dedicated tools exist.`,
+    `MANDATORY TOOL ROUTING — Using run_command for these tasks is a VIOLATION:`,
+    `  view_file (NOT cat/head/tail), create_file (NOT echo/heredoc/tee),`,
+    `  edit_file (NOT sed/awk), delete_file (NOT rm), list_dir (NOT ls/tree),`,
+    `  grep_search (NOT grep/rg), find_by_name (NOT find),`,
+    `  check_app (NOT curl), git_status/git_diff/git_log/git_commit (NOT git),`,
+    `  shadcn_install (NOT manually writing component files or npx shadcn in run_command).`,
+    `  run_command is ONLY for: npm install, builds, test scripts, dev server.`,
     ``,
-    `CRITICAL INSTRUCTION 2: Before making tool calls T, think and explicitly list out all related tools for the task at hand.`,
-    `  Only execute tool T if all other candidate tools are either more generic or cannot accomplish the task.`,
+    `VERIFICATION — After EVERY batch of file changes:`,
+    `  1. Run check_app to verify the app compiles and runs.`,
+    `  2. If errors: run_command "cat /tmp/dev-server.log | tail -80", fix, re-check.`,
+    `  3. NEVER tell the user "it's ready" without check_app confirming success.`,
   ].join("\n");
 }

@@ -1,0 +1,21 @@
+{
+  "name": "voxel-sdk",
+  "version": "0.1.0",
+  "description": "Bridge to the Claude Code CLI — MCP server management, prompt composition, OAuth auth, and streaming query execution",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.76",
+    "zod": "^3.23.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

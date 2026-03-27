@@ -201,6 +201,7 @@ const AssistantMessage: FC = () => {
                 git_stash: BashToolCard,
                 get_diagnostics: CheckAppToolCard,
                 check_app: CheckAppToolCard,
+                browser_action: BashToolCard,
                 // Built-in CLI tools (WebSearch/WebFetch)
                 WebSearch: SearchFilesToolCard,
                 WebFetch: ReadFileToolCard,

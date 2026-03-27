@@ -32,6 +32,7 @@ import { useDevServer } from "@/hooks/use-dev-server";
 import { useContainer } from "@/hooks/use-container";
 import { CodeEditor } from "@/components/code-editor/code-editor";
 import { PreviewLoadingOverlay } from "@/components/code-editor/preview-loading-overlay";
+import { PreviewBridge } from "@/components/preview-bridge";
 
 type TerminalTab = {
   id: string;
@@ -695,15 +696,18 @@ function RightPanel({
             visible={!iframeLoaded || !devServerRunning}
           />
           {effectivePreviewUrl && devServerRunning && (
-            <iframe
-              ref={iframeRef}
-              src={effectivePreviewUrl}
-              className={cn(
-                "h-full w-full rounded-xl transition-opacity duration-500",
-                iframeLoaded ? "opacity-100" : "opacity-0",
-              )}
-              onLoad={() => setIframeLoaded(true)}
-            />
+            <>
+              <iframe
+                ref={iframeRef}
+                src={`/api/preview-proxy?target=${encodeURIComponent(effectivePreviewUrl)}&path=/`}
+                className={cn(
+                  "h-full w-full rounded-xl transition-opacity duration-500",
+                  iframeLoaded ? "opacity-100" : "opacity-0",
+                )}
+                onLoad={() => setIframeLoaded(true)}
+              />
+              <PreviewBridge projectId={repoId} iframeRef={iframeRef} />
+            </>
           )}
         </div>
 
@@ -915,7 +919,7 @@ function BrowserControls({
     if (!iframe) return;
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
     setUrlValue(normalizedPath);
-    iframe.src = `${baseUrl}${normalizedPath}`;
+    iframe.src = `/api/preview-proxy?target=${encodeURIComponent(baseUrl)}&path=${encodeURIComponent(normalizedPath)}`;
     setShowRoutes(false);
   };
 

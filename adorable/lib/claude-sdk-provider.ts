@@ -44,6 +44,7 @@ import {
   BACKGROUND_LOG_PREFIX,
   MAX_TERMINAL_OUTPUT_LINES,
 } from "./codemine/constants";
+import { dispatch as browserDispatch } from "./browser-bridge";
 import { readRepoMetadata } from "./repo-storage";
 import { buildInitialEphemeral } from "./codemine/ephemeral";
 
@@ -78,7 +79,7 @@ const stripToolPrefix = (name: string): string =>
 
 // ─── Build MCP Server with VM-scoped tools ───
 
-function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRepoId?: string }) {
+function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRepoId?: string; projectId?: string; previewUrl?: string }) {
   // Background process tracking (persists across tool calls within the same session)
   const backgroundProcesses = new Map<string, { pid: number; command: string; logFile: string; startedAt: number }>();
 
@@ -90,7 +91,7 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
 
       sdkTool(
         "view_file",
-        "Read contents of a file with line numbers. Use StartLine/EndLine for large files.",
+        "Read file contents with line numbers. ALWAYS use this instead of cat/head/tail/less in run_command. Supports line ranges via StartLine/EndLine for large files. Using run_command to read files is PROHIBITED.",
         {
           AbsolutePath: z.string().describe("Absolute path to the file (within /workspace)"),
           StartLine: z.number().int().min(1).optional().describe("Start line (1-indexed)"),
@@ -120,7 +121,7 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
 
       sdkTool(
         "edit_file",
-        "Edit a file by replacing an exact string match. OldString must match exactly ONE occurrence.",
+        "Edit a file by replacing an exact string match (must be unique). ALWAYS use this instead of sed/awk/perl in run_command. Validates uniqueness and preserves encoding. Using run_command to edit files is PROHIBITED.",
         {
           AbsolutePath: z.string().describe("Absolute path to the file"),
           OldString: z.string().describe("Exact string to find (must be unique)"),
@@ -149,7 +150,7 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
 
       sdkTool(
         "create_file",
-        "Create a new file. Fails if the file already exists — use edit_file to modify existing files.",
+        "Create a new file with content. ALWAYS use this instead of echo/cat heredoc/tee/redirect in run_command. Auto-creates parent directories. Fails if file exists — use edit_file to modify. Using run_command to create files is PROHIBITED.",
         {
           AbsolutePath: z.string().describe("Absolute path for the new file"),
           Content: z.string().describe("Full file content"),
@@ -173,7 +174,7 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
 
       sdkTool(
         "delete_file",
-        "Delete a file or directory.",
+        "Delete a file or directory. Use this instead of rm/rm -rf in run_command.",
         {
           AbsolutePath: z.string().describe("Path to delete"),
         },
@@ -188,7 +189,7 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
 
       sdkTool(
         "list_dir",
-        "List files and directories. Ignores node_modules, .next, .git.",
+        "List files and directories (auto-ignores node_modules/.next/.git). ALWAYS use this instead of ls/ls -la/tree in run_command. Using run_command to list directories is PROHIBITED.",
         {
           DirectoryPath: z.string().describe("Absolute path to list"),
         },
@@ -208,7 +209,7 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
 
       sdkTool(
         "grep_search",
-        "Search for a pattern across files. Supports regex.",
+        "Search for a regex or literal pattern across files with optional glob filtering. ALWAYS use this instead of grep/rg/ag in run_command. Auto-excludes node_modules/.next/.git. Using run_command with grep is PROHIBITED.",
         {
           SearchPattern: z.string().describe("Regex or literal pattern"),
           DirectoryPath: z.string().optional().describe("Directory to scope search (default: workspace root)"),
@@ -230,7 +231,7 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
 
       sdkTool(
         "find_by_name",
-        "Find files or directories by name pattern.",
+        "Find files or directories by name pattern (glob). ALWAYS use this instead of find in run_command. Auto-excludes build artifacts. Using run_command with find is PROHIBITED.",
         {
           SearchPattern: z.string().describe("File name pattern (e.g. '*.ts', 'config*')"),
           DirectoryPath: z.string().optional().describe("Directory to scope search"),
@@ -291,7 +292,21 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
 
       sdkTool(
         "run_command",
-        "Execute a shell command in the VM workspace. Returns stdout, stderr, and exit code.",
+        `Execute a shell command in the VM workspace. Returns stdout, stderr, and exit code.
+
+IMPORTANT: Do NOT use run_command when a dedicated tool exists. You MUST use dedicated tools instead:
+- Reading files: Use view_file (NOT cat/head/tail/less)
+- Creating files: Use create_file (NOT echo/cat heredoc/tee)
+- Editing files: Use edit_file (NOT sed/awk/perl)
+- Deleting: Use delete_file (NOT rm)
+- Listing dirs: Use list_dir (NOT ls/tree)
+- Searching contents: Use grep_search (NOT grep/rg)
+- Finding files: Use find_by_name (NOT find)
+- App health: Use check_app (NOT curl)
+- Git: Use git_status/git_diff/git_log/git_commit (NOT git commands)
+- shadcn components: Use shadcn_install (NOT npx shadcn or manual file creation)
+
+run_command is ONLY for: npm install, npx commands, build scripts, test runners, dev server management, and system operations with no dedicated tool.`,
         {
           Command: z.string().describe("Shell command to execute"),
           WorkingDirectory: z.string().optional().describe("Working directory (default: workspace root)"),
@@ -396,7 +411,7 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
 
       sdkTool(
         "git_status",
-        "Show working tree status and current branch.",
+        "Show working tree status and current branch. ALWAYS use this instead of git status in run_command.",
         {},
         async () => {
           const status = await runVmCommand(vm, `git status --porcelain`);
@@ -412,7 +427,7 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
 
       sdkTool(
         "git_diff",
-        "Show file diffs (staged and unstaged).",
+        "Show file diffs (staged and unstaged). ALWAYS use this instead of git diff in run_command.",
         {
           Path: z.string().optional().describe("File path to scope the diff"),
         },
@@ -433,7 +448,7 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
 
       sdkTool(
         "git_log",
-        "Show commit history.",
+        "Show commit history. ALWAYS use this instead of git log in run_command.",
         {
           MaxEntries: z.number().int().min(1).max(50).default(10).describe("Max log entries"),
         },
@@ -445,7 +460,7 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
 
       sdkTool(
         "git_commit",
-        "Stage all changes, commit, and push. Triggers deployment if configured.",
+        "Stage all changes, commit, and push. ALWAYS use this instead of git add/commit/push in run_command. Handles config, rebase, and push automatically.",
         {
           Message: z.string().describe("Commit message"),
         },
@@ -471,7 +486,7 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
 
       sdkTool(
         "check_app",
-        "Check if the app is running by hitting the dev server and scanning logs for errors. ALWAYS call this before finishing a task.",
+        "Check if the app is running by hitting the dev server and scanning logs for errors. ALWAYS use this instead of curl in run_command. You MUST call this after every batch of code changes to verify the app works before proceeding.",
         {
           path: z.string().default("/").describe("URL path to check"),
         },
@@ -492,6 +507,70 @@ function createVmMcpServer(vm: Vm, options?: { sourceRepoId?: string; metadataRe
           return { content: [{ type: "text" as const, text: parts.join("") }] };
         },
       ),
+
+      // ─── Browser Action Tool (via Preview Bridge) ───
+
+      sdkTool(
+        "browser_action",
+        "Control the live preview browser. Actions happen visually in the user's preview panel. Supports: navigate, click, type, screenshot, scroll_up, scroll_down, wait, evaluate, get_snapshot.",
+        {
+          Action: z.enum(["navigate", "click", "type", "screenshot", "scroll_up", "scroll_down", "wait", "evaluate", "get_snapshot"]).describe("Browser action to perform"),
+          Url: z.string().optional().describe("URL for navigate action"),
+          Selector: z.string().optional().describe("CSS selector for click/type actions"),
+          Text: z.string().optional().describe("Text to type for type action"),
+          Script: z.string().optional().describe("JavaScript to evaluate for evaluate action"),
+        },
+        async (args) => {
+          const pId = options?.projectId;
+          if (!pId) return { content: [{ type: "text" as const, text: "Error: projectId not available for browser bridge." }] };
+
+          try {
+            const result = await browserDispatch(pId, {
+              action: args.Action,
+              url: args.Url || options?.previewUrl,
+              selector: args.Selector,
+              text: args.Text,
+              script: args.Script,
+              scrollDirection: args.Action === "scroll_up" ? "up" : args.Action === "scroll_down" ? "down" : undefined,
+            });
+
+            if (!result.success) {
+              return { content: [{ type: "text" as const, text: `Browser action '${args.Action}' failed: ${result.error ?? "Unknown error"}` }] };
+            }
+
+            const parts = [`Action: ${args.Action} — OK`];
+            if (result.data) parts.push(`\nResult: ${typeof result.data === "string" ? result.data : JSON.stringify(result.data)}`);
+            if (result.screenshot) parts.push(`\nScreenshot captured (${result.screenshot.length} bytes base64)`);
+            return { content: [{ type: "text" as const, text: parts.join("") }] };
+          } catch (err) {
+            return { content: [{ type: "text" as const, text: `Bridge error: ${err instanceof Error ? err.message : String(err)}` }] };
+          }
+        },
+      ),
+
+      // ─── shadcn/ui Tools ───
+
+      sdkTool(
+        "shadcn_install",
+        "Install shadcn/ui components into the project. This is the ONLY correct way to add shadcn components — do NOT manually create files in components/ui/ or use cat/echo to write component files. Handles dependencies, styling, and proper file placement automatically.",
+        {
+          Components: z.string().describe("Space-separated component names to install (e.g. 'button dialog card input')"),
+        },
+        async (args) => {
+          const result = await runVmCommand(vm, `cd /workspace && npx --yes shadcn@latest add ${args.Components} --yes --overwrite 2>&1`);
+          return { content: [{ type: "text" as const, text: result.stdout + (result.stderr ? `\nstderr: ${result.stderr}` : "") }] };
+        },
+      ),
+
+      sdkTool(
+        "shadcn_list",
+        "List all available shadcn/ui components in the registry. Use this to discover what components exist before building custom ones.",
+        {},
+        async () => {
+          const result = await runVmCommand(vm, `npx --yes shadcn@latest list 2>&1`);
+          return { content: [{ type: "text" as const, text: result.stdout || "(could not fetch component list)" }] };
+        },
+      ),
     ],
   });
 }
@@ -504,6 +583,8 @@ const ALL_MCP_TOOL_NAMES = [
   "run_command", "run_in_background", "read_terminal_output", "kill_process",
   "git_status", "git_diff", "git_log", "git_commit",
   "check_app",
+  "browser_action",
+  "shadcn_install", "shadcn_list",
 ].map(mcpToolName);
 
 // Built-in CLI tools allowed alongside MCP tools.
@@ -541,6 +622,8 @@ export function createClaudeSdkStreamResponse(
   const mcpServer = createVmMcpServer(vm, {
     sourceRepoId: options.sourceRepoId,
     metadataRepoId: options.metadataRepoId,
+    projectId: options.repoId,
+    previewUrl: options.previewUrl,
   });
 
   const sessionId = crypto.randomUUID();
